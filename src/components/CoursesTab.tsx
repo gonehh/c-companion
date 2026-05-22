@@ -321,12 +321,35 @@ function QuizView({
     setAnswers(newAns);
     setSelected(null);
     if (last) {
-      const correct = newAns.reduce((acc, a, k) => acc + (a === questions[k].answer ? 1 : 0), 0);
+      const correct = newAns.reduce((acc, a, k) => {
+        const qk = questions[k];
+        if (!qk) return acc;
+        return acc + (a === qk.answer ? 1 : 0);
+      }, 0);
       onDone(correct);
     } else {
       setI(i + 1);
     }
   };
+
+  if (!q) {
+    return (
+      <ScrollView
+        className="flex-1 bg-background"
+        contentContainerStyle={{ padding, paddingBottom: padding * 2 }}
+      >
+        <View className="mx-auto w-full" style={maxWidth ? { maxWidth } : undefined}>
+          <Pressable onPress={onBack} className="mb-4 flex-row items-center gap-1">
+            <ArrowLeft color="#a89fb5" size={16} />
+            <Text className="text-sm text-muted-foreground">wstecz</Text>
+          </Pressable>
+          <View className="rounded-2xl border border-border bg-card p-4">
+            <Text className="text-sm text-muted-foreground">Brak pytań do wyświetlenia.</Text>
+          </View>
+        </View>
+      </ScrollView>
+    );
+  }
 
   return (
     <ScrollView
