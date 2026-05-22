@@ -18,7 +18,7 @@ export function CalendarTab() {
   const { user } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
   const [cursor, setCursor] = useState(new Date());
-  const [openAdd, setOpenAdd] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [openAi, setOpenAi] = useState(false);
 
   const load = async () => {
@@ -28,7 +28,6 @@ export function CalendarTab() {
   };
   useEffect(() => { load(); }, [user]);
 
-  // Powiadomienia
   useEffect(() => {
     if (!("Notification" in window)) return;
     if (Notification.permission === "default") Notification.requestPermission();
@@ -53,7 +52,7 @@ export function CalendarTab() {
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
   const firstDay = new Date(year, month, 1);
-  const startWeekday = (firstDay.getDay() + 6) % 7; // Pn=0
+  const startWeekday = (firstDay.getDay() + 6) % 7;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
   const grid = useMemo(() => {
@@ -84,6 +83,8 @@ export function CalendarTab() {
         <button onClick={() => setCursor(new Date(year, month + 1, 1))} className="p-2 rounded-lg hover:bg-secondary"><ChevronRight className="w-5 h-5" /></button>
       </div>
 
+      <p className="text-xs text-muted-foreground mb-2 text-center">Kliknij dzień, aby dodać przypomnienie</p>
+
       <div className="grid grid-cols-7 gap-1 mb-1">
         {PL_DAYS.map(d => <div key={d} className="text-xs text-muted-foreground text-center py-1">{d}</div>)}
       </div>
@@ -91,37 +92,46 @@ export function CalendarTab() {
         {grid.map((d, i) => {
           if (!d) return <div key={i} />;
           const k = dateKey(d);
-          const has = eventsByDate.has(k);
+          const dayEvents = eventsByDate.get(k) ?? [];
+          const has = dayEvents.length > 0;
           const isToday = k === todayKey;
           return (
-            <div key={i} className={`aspect-square rounded-lg border text-sm flex flex-col items-center justify-center ${isToday ? "border-primary bg-primary/10" : "border-border bg-card"}`}>
+            <button
+              key={i}
+              onClick={() => setSelectedDate(k)}
+              className={`aspect-square rounded-lg border text-sm flex flex-col items-center justify-center transition active:scale-95 ${
+                isToday ? "border-primary bg-primary/15"
+                : has ? "border-accent/60 bg-accent/10 hover:bg-accent/20"
+                : "border-border bg-card hover:bg-secondary"
+              }`}
+            >
               <span className="font-semibold">{d}</span>
-              {has && <span className="w-1.5 h-1.5 rounded-full bg-accent mt-0.5" />}
-            </div>
+              {has && (
+                <span className="flex gap-0.5 mt-0.5">
+                  {dayEvents.slice(0, 3).map((_, j) => (
+                    <span key={j} className="w-1.5 h-1.5 rounded-full bg-accent" />
+                  ))}
+                </span>
+              )}
+            </button>
           );
         })}
       </div>
 
-      <div className="flex gap-2 mb-4">
-        <Dialog open={openAdd} onOpenChange={setOpenAdd}>
-          <DialogTrigger asChild>
-            <Button className="flex-1"><Plus className="w-4 h-4 mr-1" /> Dodaj</Button>
-          </DialogTrigger>
-          <AddEventDialog onAdded={() => { setOpenAdd(false); load(); }} />
-        </Dialog>
-        <Dialog open={openAi} onOpenChange={setOpenAi}>
-          <DialogTrigger asChild>
-            <Button variant="secondary" className="flex-1"><Sparkles className="w-4 h-4 mr-1" /> Pomocnik AI</Button>
-          </DialogTrigger>
-          <AiPlannerDialog onPlanned={() => { setOpenAi(false); load(); }} />
-        </Dialog>
-      </div>
+      <Dialog open={openAi} onOpenChange={setOpenAi}>
+        <DialogTrigger asChild>
+          <Button variant="secondary" className="w-full mb-5">
+            <Sparkles className="w-4 h-4 mr-1" /> Pomocnik AI — zaplanuj naukę
+          </Button>
+        </DialogTrigger>
+        <AiPlannerDialog onPlanned={() => { setOpenAi(false); load(); }} />
+      </Dialog>
 
       <h3 className="font-bold mb-2">Nadchodzące przypomnienia</h3>
       <div className="space-y-2">
         {events.length === 0 && (
           <div className="text-sm text-muted-foreground bg-card border border-border rounded-xl p-4">
-            Brak zaplanowanej nauki. Dodaj termin lub poproś o plan AI.
+            Brak zaplanowanej nauki. Kliknij w dzień powyżej, aby dodać termin.
           </div>
         )}
         {events.map(e => (
@@ -136,6 +146,18 @@ export function CalendarTab() {
           </div>
         ))}
       </div>
+
+      {/* Dialog dla wybranego dnia */}
+      <Dialog open={!!selectedDate} onOpenChange={(o) => !o && setSelectedDate(null)}>
+        {selectedDate && (
+          <DayDialog
+            date={selectedDate}
+            events={eventsByDate.get(selectedDate) ?? []}
+            onChanged={load}
+            onClose={() => setSelectedDate(null)}
+          />
+        )}
+      </Dialog>
     </div>
   );
 }
@@ -145,9 +167,8 @@ function formatDate(d: string) {
   return `${String(day).padStart(2,"0")}.${String(m).padStart(2,"0")}.${y}`;
 }
 
-function AddEventDialog({ onAdded }: { onAdded: () => void }) {
+function DayDialog({ date, events, onChanged, onClose }: { date: string; events: Event[]; onChanged: () => void; onClose: () => void }) {
   const { user } = useAuth();
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [time, setTime] = useState("18:00");
   const [content, setContent] = useState("");
   const [busy, setBusy] = useState(false);
@@ -160,14 +181,47 @@ function AddEventDialog({ onAdded }: { onAdded: () => void }) {
     });
     setBusy(false);
     if (error) toast.error(error.message);
-    else { toast.success("Dodano przypomnienie"); onAdded(); }
+    else {
+      toast.success("Dodano przypomnienie");
+      setContent("");
+      onChanged();
+    }
+  };
+
+  const remove = async (id: string) => {
+    await supabase.from("study_events").delete().eq("id", id);
+    toast.success("Usunięto");
+    onChanged();
   };
 
   return (
-    <DialogContent>
-      <DialogHeader><DialogTitle>Nowy termin nauki</DialogTitle></DialogHeader>
-      <div className="space-y-3">
-        <div><Label>Data</Label><Input type="date" value={date} onChange={e => setDate(e.target.value)} /></div>
+    <DialogContent className="max-h-[85vh] overflow-y-auto">
+      <DialogHeader>
+        <DialogTitle>{formatDate(date)}</DialogTitle>
+      </DialogHeader>
+
+      {events.length > 0 && (
+        <div className="space-y-2 mb-2">
+          <div className="text-xs font-semibold text-muted-foreground">Zaplanowane:</div>
+          {events.map(e => (
+            <div key={e.id} className="flex items-start gap-2 bg-secondary/40 border border-border rounded-lg p-2">
+              <Bell className="w-4 h-4 mt-0.5 text-primary shrink-0" />
+              <div className="flex-1">
+                <div className="text-sm font-semibold">{e.event_time.slice(0,5)}</div>
+                <div className="text-xs text-muted-foreground">{e.content}</div>
+              </div>
+              <button onClick={() => remove(e.id)} className="p-1 text-muted-foreground hover:text-destructive">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="space-y-3 pt-2 border-t border-border">
+        <div className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+          <Plus className="w-3 h-3" /> Dodaj nowe przypomnienie
+        </div>
         <div><Label>Godzina</Label><Input type="time" value={time} onChange={e => setTime(e.target.value)} /></div>
         <div><Label>Treść</Label><Textarea value={content} onChange={e => setContent(e.target.value)} placeholder="Np. powtórka pętli for" /></div>
         <Button className="w-full" onClick={save} disabled={busy || !content.trim()}>Zapisz</Button>
