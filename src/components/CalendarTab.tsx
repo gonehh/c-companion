@@ -44,8 +44,11 @@ export function CalendarTab() {
   const [openAdd, setOpenAdd] = useState(false);
   const [openAi, setOpenAi] = useState(false);
   const [openClearAll, setOpenClearAll] = useState(false);
+  const [openDeleteOne, setOpenDeleteOne] = useState(false);
   const [clearingAll, setClearingAll] = useState(false);
+  const [deletingOne, setDeletingOne] = useState(false);
   const [previewDateKey, setPreviewDateKey] = useState<string | null>(null);
+  const [pendingDeleteEvent, setPendingDeleteEvent] = useState<Event | null>(null);
   const notifiedRef = useRef<Set<string>>(new Set());
   const previewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -108,14 +111,21 @@ export function CalendarTab() {
     return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
   })();
 
-  const deleteEvent = async (id: string) => {
-    const { error } = await supabase.from("study_events").delete().eq("id", id);
+  const deleteEvent = async () => {
+    if (!pendingDeleteEvent) return;
+
+    setDeletingOne(true);
+    const { error } = await supabase.from("study_events").delete().eq("id", pendingDeleteEvent.id);
+    setDeletingOne(false);
+
     if (error) {
       toast.error(error.message);
       return;
     }
 
-    notifiedRef.current.delete(id);
+    notifiedRef.current.delete(pendingDeleteEvent.id);
+    setOpenDeleteOne(false);
+    setPendingDeleteEvent(null);
     toast.success("Usunięto przypomnienie");
     load();
   };
@@ -298,7 +308,10 @@ export function CalendarTab() {
                 <Text className="text-sm text-muted-foreground">{e.content}</Text>
               </View>
               <Pressable
-                onPress={() => deleteEvent(e.id)}
+                onPress={() => {
+                  setPendingDeleteEvent(e);
+                  setOpenDeleteOne(true);
+                }}
                 className="h-10 w-10 items-center justify-center rounded-full bg-destructive active:opacity-80"
               >
                 <Trash2 color="#fafafa" size={18} />
@@ -323,6 +336,49 @@ export function CalendarTab() {
               load();
             }}
           />
+        </Dialog>
+
+        <Dialog
+          open={openDeleteOne}
+          onOpenChange={(open) => {
+            setOpenDeleteOne(open);
+            if (!open && !deletingOne) setPendingDeleteEvent(null);
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Usunąć przypomnienie?</DialogTitle>
+            </DialogHeader>
+            <View className="gap-3">
+              <Text className="text-sm text-muted-foreground">
+                {pendingDeleteEvent
+                  ? `Ta operacja usunie przypomnienie z dnia ${formatDate(pendingDeleteEvent.event_date)} o ${pendingDeleteEvent.event_time.slice(0, 5)}.`
+                  : "Ta operacja usunie wybrane przypomnienie z kalendarza."}
+              </Text>
+              <View className="flex-row gap-2">
+                <Button
+                  variant="secondary"
+                  className="flex-1"
+                  onPress={() => {
+                    setOpenDeleteOne(false);
+                    setPendingDeleteEvent(null);
+                  }}
+                  disabled={deletingOne}
+                >
+                  Nie usuwaj
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="flex-1"
+                  onPress={deleteEvent}
+                  loading={deletingOne}
+                  disabled={deletingOne || !pendingDeleteEvent}
+                >
+                  Usuń
+                </Button>
+              </View>
+            </View>
+          </DialogContent>
         </Dialog>
 
         <Dialog open={openClearAll} onOpenChange={setOpenClearAll}>
