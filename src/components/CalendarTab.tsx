@@ -253,6 +253,7 @@ export function CalendarTab() {
   }, []);
 
   const handleReminderPress = (event: Event) => {
+    Vibration.vibrate(6);
     setEditingEvent(event);
     setOpenEdit(true);
   };
@@ -453,7 +454,11 @@ export function CalendarTab() {
                   />
                 )}
               </Pressable>
-              <Pressable onPress={() => handleReminderPress(e)} className="flex-1 flex-row items-start gap-3">
+              <Pressable
+                onLongPress={() => handleReminderPress(e)}
+                delayLongPress={180}
+                className="flex-1 flex-row items-start gap-3"
+              >
                 <View className="flex-1">
                   <Text className="text-sm font-semibold text-foreground">
                     {formatDate(e.event_date)} • {e.event_time.slice(0, 5)}
