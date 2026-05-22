@@ -185,7 +185,7 @@ export function CalendarTab() {
             const dayEvents = eventsByDate.get(k) ?? [];
             const has = dayEvents.length > 0;
             const isToday = k === todayKey;
-            const isPreviewOpen = previewDateKey === k && has;
+            const isPreviewOpen = previewDateKey === k;
             return (
               <View
                 key={i}
@@ -194,7 +194,6 @@ export function CalendarTab() {
                 <Pressable
                   delayLongPress={250}
                   onLongPress={() => {
-                    if (!has) return;
                     setPreviewDateKey(k);
                   }}
                   onPressOut={() => {
@@ -215,19 +214,25 @@ export function CalendarTab() {
                       }}
                     >
                       <Text className="text-[11px] font-semibold uppercase tracking-wide text-primary">
-                        Zapisano przez użytkownika
+                        {has ? "Zapisano przez użytkownika" : "Brak zaplanowanej nauki"}
                       </Text>
                       <Text className="mt-1 text-xs font-semibold text-foreground">{formatDate(k)}</Text>
-                      <View className="mt-2 gap-1">
-                        {dayEvents.map((event) => (
-                          <View key={event.id} className="rounded-lg bg-secondary px-2 py-1.5">
-                            <Text className="text-[11px] font-semibold text-foreground">
-                              Godzina: {event.event_time.slice(0, 5)}
-                            </Text>
-                            <Text className="text-[11px] text-muted-foreground">{event.content}</Text>
-                          </View>
-                        ))}
-                      </View>
+                      {has ? (
+                        <View className="mt-2 gap-1">
+                          {dayEvents.map((event) => (
+                            <View key={event.id} className="rounded-lg bg-secondary px-2 py-1.5">
+                              <Text className="text-[11px] font-semibold text-foreground">
+                                Godzina: {event.event_time.slice(0, 5)}
+                              </Text>
+                              <Text className="text-[11px] text-muted-foreground">{event.content}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      ) : (
+                        <Text className="mt-2 text-[11px] text-muted-foreground">
+                          Nie masz zaplanowanej nauki na ten dzień.
+                        </Text>
+                      )}
                     </View>
                   )}
                   <View
