@@ -139,12 +139,6 @@ export function CalendarTab() {
   };
 
   useEffect(() => {
-    if (previewDateKey && !eventsByDate.has(previewDateKey)) {
-      setPreviewDateKey(null);
-    }
-  }, [eventsByDate, previewDateKey]);
-
-  useEffect(() => {
     setPreviewDateKey(null);
   }, [cursor]);
 
