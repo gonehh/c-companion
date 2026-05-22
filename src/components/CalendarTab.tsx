@@ -1046,10 +1046,7 @@ function EditEventDialogBody({
       </DialogHeader>
       <View className="gap-3">
         <DatePickerField label="Data" value={date} onChange={setDate} />
-        <View>
-          <Label>Godzina (HH:MM)</Label>
-          <Input value={time} onChangeText={setTime} placeholder="18:00" autoCapitalize="none" />
-        </View>
+        <TimePickerField label="Godzina" value={time} onChange={setTime} />
         <View>
           <Label>Treść</Label>
           <Textarea value={content} onChangeText={setContent} placeholder="Np. powtórka pętli for" />
