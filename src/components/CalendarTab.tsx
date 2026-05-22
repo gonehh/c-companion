@@ -229,8 +229,11 @@ export function CalendarTab() {
                 </Text>
                 <Text className="text-sm text-muted-foreground">{e.content}</Text>
               </View>
-              <Pressable onPress={() => deleteEvent(e.id)} className="rounded p-1 active:opacity-60">
-                <Trash2 color="#a89fb5" size={16} />
+              <Pressable
+                onPress={() => deleteEvent(e.id)}
+                className="h-10 w-10 items-center justify-center rounded-full bg-destructive active:opacity-80"
+              >
+                <Trash2 color="#fafafa" size={18} />
               </Pressable>
             </View>
           ))}
