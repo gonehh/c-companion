@@ -1,5 +1,6 @@
 import "../global.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import * as Notifications from "expo-notifications";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -8,6 +9,15 @@ import { useState } from "react";
 import { AuthProvider } from "@/lib/auth";
 import { ResponsiveProvider } from "@/lib/responsive";
 import { Toast } from "@/components/ui/toast";
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 
 export default function RootLayout() {
   const [client] = useState(() => new QueryClient());

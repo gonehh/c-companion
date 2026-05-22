@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ensureLocalNotificationPermissions, syncStudyEventNotifications } from "@/lib/notifications";
 import { toast } from "@/components/ui/toast";
 import { useScreenLayout } from "@/lib/responsive";
 import { cn } from "@/lib/utils";
@@ -49,6 +50,7 @@ export function CalendarTab() {
   const [deletingOne, setDeletingOne] = useState(false);
   const [previewDateKey, setPreviewDateKey] = useState<string | null>(null);
   const [pendingDeleteEvent, setPendingDeleteEvent] = useState<Event | null>(null);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(Platform.OS === "web");
   const notifiedRef = useRef<Set<string>>(new Set());
   const previewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -67,6 +69,27 @@ export function CalendarTab() {
   }, [user]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    if (!user || Platform.OS === "web") {
+      setNotificationsEnabled(Platform.OS === "web");
+      return;
+    }
+
+    ensureLocalNotificationPermissions()
+      .then((granted) => {
+        if (!cancelled) setNotificationsEnabled(granted);
+      })
+      .catch(() => {
+        if (!cancelled) setNotificationsEnabled(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  useEffect(() => {
     const sent = notifiedRef.current;
     const t = setInterval(() => {
       const now = new Date();
@@ -81,6 +104,14 @@ export function CalendarTab() {
     }, 30_000);
     return () => clearInterval(t);
   }, [events]);
+
+  useEffect(() => {
+    if (!user || !notificationsEnabled) return;
+
+    syncStudyEventNotifications(events).catch((error) => {
+      console.error("Nie udalo sie zsynchronizowac powiadomien lokalnych", error);
+    });
+  }, [events, notificationsEnabled, user]);
 
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
