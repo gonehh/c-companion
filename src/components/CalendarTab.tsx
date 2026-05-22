@@ -47,7 +47,6 @@ export function CalendarTab() {
   const [clearingAll, setClearingAll] = useState(false);
   const [previewDateKey, setPreviewDateKey] = useState<string | null>(null);
   const notifiedRef = useRef<Set<string>>(new Set());
-  const longPressTriggeredRef = useRef(false);
 
   const load = async () => {
     if (!user) return;
@@ -196,16 +195,10 @@ export function CalendarTab() {
                   delayLongPress={250}
                   onLongPress={() => {
                     if (!has) return;
-                    longPressTriggeredRef.current = true;
-                    setPreviewDateKey((current) => (current === k ? null : k));
+                    setPreviewDateKey(k);
                   }}
-                  onPress={() => {
-                    if (longPressTriggeredRef.current) {
-                      longPressTriggeredRef.current = false;
-                      return;
-                    }
-
-                    if (previewDateKey) setPreviewDateKey(null);
+                  onPressOut={() => {
+                    setPreviewDateKey((current) => (current === k ? null : current));
                   }}
                   className="flex-1"
                 >
