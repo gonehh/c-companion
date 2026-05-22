@@ -221,7 +221,7 @@ export function CalendarTab() {
                       }}
                     >
                       <Text className="text-[11px] font-semibold uppercase tracking-wide text-primary">
-                        {has ? "Zapisano przez użytkownika" : "Brak zaplanowanej nauki"}
+                        {has ? "Zaplanowane na" : "Brak zaplanowanej nauki"}
                       </Text>
                       <Text className="mt-1 text-xs font-semibold text-foreground">{formatDate(k)}</Text>
                       {has ? (
