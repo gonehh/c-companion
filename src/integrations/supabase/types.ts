@@ -110,6 +110,132 @@ export type Database = {
         }
         Relationships: []
       }
+      user_stats: {
+        Row: {
+          created_at: string
+          level: number
+          theme: string
+          user_id: string
+          xp: number
+        }
+        Insert: {
+          created_at?: string
+          level?: number
+          theme?: string
+          user_id: string
+          xp?: number
+        }
+        Update: {
+          created_at?: string
+          level?: number
+          theme?: string
+          user_id?: string
+          xp?: number
+        }
+        Relationships: []
+      }
+      lesson_progress: {
+        Row: {
+          completed_at: string
+          id: string
+          lesson_id: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string
+          id?: string
+          lesson_id: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string
+          id?: string
+          lesson_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      stage_quiz_attempts: {
+        Row: {
+          correct: number
+          created_at: string
+          id: string
+          stage_id: string
+          total: number
+          user_id: string
+          xp_gained: number
+        }
+        Insert: {
+          correct: number
+          created_at?: string
+          id?: string
+          stage_id: string
+          total: number
+          user_id: string
+          xp_gained: number
+        }
+        Update: {
+          correct?: number
+          created_at?: string
+          id?: string
+          stage_id?: string
+          total?: number
+          user_id?: string
+          xp_gained?: number
+        }
+        Relationships: []
+      }
+      exam_attempts: {
+        Row: {
+          correct: number
+          created_at: string
+          exam_id: string
+          id: string
+          total: number
+          user_id: string
+          xp_gained: number
+        }
+        Insert: {
+          correct: number
+          created_at?: string
+          exam_id: string
+          id?: string
+          total: number
+          user_id: string
+          xp_gained: number
+        }
+        Update: {
+          correct?: number
+          created_at?: string
+          exam_id?: string
+          id?: string
+          total?: number
+          user_id?: string
+          xp_gained?: number
+        }
+        Relationships: []
+      }
+      learning_goals: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
