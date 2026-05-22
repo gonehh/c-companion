@@ -70,7 +70,6 @@ export function CalendarTab() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(Platform.OS === "web");
   const notifiedRef = useRef<Set<string>>(new Set());
   const previewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastReminderTapRef = useRef<{ id: string; at: number } | null>(null);
 
   const load = async () => {
     if (!user) return;
@@ -254,17 +253,8 @@ export function CalendarTab() {
   }, []);
 
   const handleReminderPress = (event: Event) => {
-    const now = Date.now();
-    const lastTap = lastReminderTapRef.current;
-
-    if (lastTap?.id === event.id && now - lastTap.at <= 350) {
-      lastReminderTapRef.current = null;
-      setEditingEvent(event);
-      setOpenEdit(true);
-      return;
-    }
-
-    lastReminderTapRef.current = { id: event.id, at: now };
+    setEditingEvent(event);
+    setOpenEdit(true);
   };
 
   const handleNotificationToggle = async (event: Event) => {
