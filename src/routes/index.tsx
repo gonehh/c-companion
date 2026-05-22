@@ -1,26 +1,34 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { AuthProvider, useAuth } from "@/lib/auth";
+import { AuthScreen } from "@/components/AuthScreen";
+import { AppShell } from "@/components/AppShell";
+import { Toaster } from "@/components/ui/sonner";
 
 export const Route = createFileRoute("/")({
-  component: Index,
+  head: () => ({
+    meta: [
+      { title: "C++ Quest — Nauka C++ krok po kroku" },
+      { name: "description", content: "Mobilna aplikacja do nauki C++: 100 poziomów, quizy, medale i planer nauki z pomocą AI." },
+      { property: "og:title", content: "C++ Quest" },
+      { property: "og:description", content: "Naucz się C++ w prostych krokach z planerem AI." },
+    ],
+  }),
+  component: Page,
 });
 
-// IMPORTANT: Replace this placeholder. For sites with multiple pages (About, Services, Contact, etc.),
-// create separate route files (about.tsx, services.tsx, contact.tsx) — don't put all pages in this file.
-function PlaceholderIndex() {
+function Page() {
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
+    <AuthProvider>
+      <Inner />
+      <Toaster />
+    </AuthProvider>
   );
 }
 
-function Index() {
-  return <PlaceholderIndex />;
+function Inner() {
+  const { user, loading } = useAuth();
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Ładowanie...</div>;
+  }
+  return user ? <AppShell /> : <AuthScreen />;
 }
