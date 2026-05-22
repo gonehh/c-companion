@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { View, Text, Pressable, ScrollView } from "react-native";
-import { LogOut, Award, Plus } from "lucide-react-native";
+import { LogOut, Trophy, Plus } from "lucide-react-native";
 import { useAuth, type ThemeId } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { TIER_COLOR_STOPS, TIER_LABEL, TIER_ORDER, type MedalTier } from "@/lib/medals";
@@ -126,7 +126,7 @@ export function ProfileTab() {
         </View>
 
         <View className="mb-3 flex-row items-center gap-2">
-          <Award color="#a173e8" size={16} />
+          <Trophy color="#a173e8" size={16} />
           <Text className="font-bold" style={{ color: theme.colors.foreground }}>
             Achievements
           </Text>
@@ -205,17 +205,24 @@ export function ProfileTab() {
         <Dialog open={!!openAchievement} onOpenChange={(v) => !v && setOpenAchievement(null)}>
           {openAchievement && (
             <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Achievement: {TIER_LABEL[openAchievement]}</DialogTitle>
-              </DialogHeader>
-              <View className="items-center py-4">
-                <AchievementIcon theme={theme} tier={openAchievement} size={128} locked={false} />
-                <Text className="mt-4 text-center" style={{ color: theme.colors.foreground }}>
-                  Odblokowane na poziomie{" "}
-                  <Text className="font-bold">
-                    {achievements.find((a) => a.tier === openAchievement)?.threshold}
-                  </Text>
+              <View className="items-center py-5">
+                <AchievementIcon theme={theme} tier={openAchievement} size={84} locked={false} />
+                <Text className="mt-3 text-lg font-bold" style={{ color: theme.colors.foreground }}>
+                  {TIER_LABEL[openAchievement]} Medal
                 </Text>
+                <Text className="mt-1 text-sm" style={{ color: theme.colors.mutedForeground }}>
+                  Earned
+                </Text>
+                <Text className="mt-3 text-xs" style={{ color: theme.colors.mutedForeground }}>
+                  Progress:{" "}
+                  {(() => {
+                    const t = achievements.find((a) => a.tier === openAchievement)?.threshold ?? 0;
+                    return `${t}/${t}`;
+                  })()}
+                </Text>
+                <Button className="mt-5 w-full" onPress={() => setOpenAchievement(null)}>
+                  Close
+                </Button>
               </View>
             </DialogContent>
           )}
@@ -263,9 +270,8 @@ function AchievementIcon({
   size: number;
   locked: boolean;
 }) {
-  const [from, to] = TIER_COLOR_STOPS[tier];
+  const [from] = TIER_COLOR_STOPS[tier];
   const bg = locked ? theme.colors.muted : from;
-  const overlay = locked ? theme.colors.border : to;
   const iconColor = locked ? theme.colors.mutedForeground : "rgba(15,10,20,0.7)";
   return (
     <View
@@ -273,7 +279,7 @@ function AchievementIcon({
         width: size,
         height: size,
         borderRadius: size / 2,
-        borderWidth: 4,
+        borderWidth: 3,
         borderColor: theme.colors.border,
         backgroundColor: bg,
         alignItems: "center",
@@ -281,15 +287,7 @@ function AchievementIcon({
         overflow: "hidden",
       }}
     >
-      <View
-        style={{
-          position: "absolute",
-          inset: 0,
-          backgroundColor: overlay,
-          opacity: 0.45,
-        }}
-      />
-      <Award color={iconColor} size={size * 0.4} />
+      <Trophy color={iconColor} size={size * 0.46} />
     </View>
   );
 }

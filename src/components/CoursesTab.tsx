@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { View, Text, Pressable, ScrollView } from "react-native";
-import { ArrowLeft, CheckCircle2, Lock, Sparkles } from "lucide-react-native";
+import { ArrowLeft, CheckCircle2, Lock, Sparkles, Trophy } from "lucide-react-native";
 import { useAuth } from "@/lib/auth";
 import { isValidTrack, SkillSurvey } from "./SkillSurvey";
 import { supabase } from "@/integrations/supabase/client";
@@ -180,22 +180,35 @@ export function CoursesTab() {
           ].map((a) => {
             const unlocked = lessonsCompleted >= a.stage;
             return (
-              <View key={a.key} className="flex-1 items-center">
+              <View key={a.key} className="flex-1">
                 <View
-                  className="h-16 w-16 items-center justify-center rounded-2xl border"
-                  style={{
-                    borderColor: theme.colors.border,
-                    backgroundColor: unlocked ? a.color : theme.colors.muted,
-                  }}
+                  className="items-center rounded-2xl border py-3"
+                  style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.card }}
                 >
-                  <Sparkles color={unlocked ? "rgba(15,10,20,0.7)" : theme.colors.mutedForeground} size={20} />
+                  <View
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
+                      borderWidth: 3,
+                      borderColor: theme.colors.border,
+                      backgroundColor: unlocked ? a.color : theme.colors.muted,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Trophy
+                      color={unlocked ? "rgba(15,10,20,0.7)" : theme.colors.mutedForeground}
+                      size={20}
+                    />
+                  </View>
+                  <Text className="mt-2 text-xs font-semibold" style={{ color: theme.colors.foreground }}>
+                    {a.label}
+                  </Text>
+                  <Text className="text-[10px]" style={{ color: theme.colors.mutedForeground }}>
+                    {a.stage} lvls
+                  </Text>
                 </View>
-                <Text className="mt-2 text-xs font-semibold" style={{ color: theme.colors.foreground }}>
-                  {a.label}
-                </Text>
-                <Text className="text-[10px]" style={{ color: theme.colors.mutedForeground }}>
-                  {a.stage} lvls
-                </Text>
               </View>
             );
           })}
@@ -516,4 +529,3 @@ function ExamView({
     </ScrollView>
   );
 }
-
