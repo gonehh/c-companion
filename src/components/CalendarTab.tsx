@@ -43,16 +43,19 @@ export function CalendarTab() {
   const [events, setEvents] = useState<Event[]>([]);
   const [cursor, setCursor] = useState(new Date());
   const [openAdd, setOpenAdd] = useState(false);
+  const [openEdit, setOpenEdit] = useState(false);
   const [openAi, setOpenAi] = useState(false);
   const [openClearAll, setOpenClearAll] = useState(false);
   const [openDeleteOne, setOpenDeleteOne] = useState(false);
   const [clearingAll, setClearingAll] = useState(false);
   const [deletingOne, setDeletingOne] = useState(false);
   const [previewDateKey, setPreviewDateKey] = useState<string | null>(null);
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [pendingDeleteEvent, setPendingDeleteEvent] = useState<Event | null>(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(Platform.OS === "web");
   const notifiedRef = useRef<Set<string>>(new Set());
   const previewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastReminderTapRef = useRef<{ id: string; at: number } | null>(null);
 
   const load = async () => {
     if (!user) return;
@@ -188,6 +191,20 @@ export function CalendarTab() {
       if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
     };
   }, []);
+
+  const handleReminderPress = (event: Event) => {
+    const now = Date.now();
+    const lastTap = lastReminderTapRef.current;
+
+    if (lastTap?.id === event.id && now - lastTap.at <= 350) {
+      lastReminderTapRef.current = null;
+      setEditingEvent(event);
+      setOpenEdit(true);
+      return;
+    }
+
+    lastReminderTapRef.current = { id: event.id, at: now };
+  };
 
   return (
     <ScrollView
@@ -331,13 +348,15 @@ export function CalendarTab() {
           )}
           {events.map((e) => (
             <View key={e.id} className="flex-row items-start gap-3 rounded-xl border border-border bg-card p-3">
-              <Bell color="#a173e8" size={16} style={{ marginTop: 2 }} />
-              <View className="flex-1">
-                <Text className="text-sm font-semibold text-foreground">
-                  {formatDate(e.event_date)} • {e.event_time.slice(0, 5)}
-                </Text>
-                <Text className="text-sm text-muted-foreground">{e.content}</Text>
-              </View>
+              <Pressable onPress={() => handleReminderPress(e)} className="flex-1 flex-row items-start gap-3">
+                <Bell color="#a173e8" size={16} style={{ marginTop: 2 }} />
+                <View className="flex-1">
+                  <Text className="text-sm font-semibold text-foreground">
+                    {formatDate(e.event_date)} • {e.event_time.slice(0, 5)}
+                  </Text>
+                  <Text className="text-sm text-muted-foreground">{e.content}</Text>
+                </View>
+              </Pressable>
               <Pressable
                 onPress={() => {
                   setPendingDeleteEvent(e);
@@ -358,6 +377,29 @@ export function CalendarTab() {
               load();
             }}
           />
+        </Dialog>
+
+        <Dialog
+          open={openEdit}
+          onOpenChange={(open) => {
+            setOpenEdit(open);
+            if (!open) setEditingEvent(null);
+          }}
+        >
+          {editingEvent ? (
+            <EditEventDialogBody
+              event={editingEvent}
+              onCanceled={() => {
+                setOpenEdit(false);
+                setEditingEvent(null);
+              }}
+              onSaved={() => {
+                setOpenEdit(false);
+                setEditingEvent(null);
+                load();
+              }}
+            />
+          ) : null}
         </Dialog>
 
         <Dialog open={openAi} onOpenChange={setOpenAi}>
@@ -538,6 +580,88 @@ function AddEventDialogBody({ onAdded }: { onAdded: () => void }) {
         <Button onPress={save} loading={busy} disabled={busy || !content.trim()}>
           Zapisz
         </Button>
+      </View>
+    </DialogContent>
+  );
+}
+
+function EditEventDialogBody({
+  event,
+  onCanceled,
+  onSaved,
+}: {
+  event: Event;
+  onCanceled: () => void;
+  onSaved: () => void;
+}) {
+  const [date, setDate] = useState(event.event_date);
+  const [time, setTime] = useState(event.event_time.slice(0, 5));
+  const [content, setContent] = useState(event.content);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setDate(event.event_date);
+    setTime(event.event_time.slice(0, 5));
+    setContent(event.content);
+  }, [event]);
+
+  const save = async () => {
+    if (!content.trim()) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      toast.error("Data musi być w formacie RRRR-MM-DD");
+      return;
+    }
+    if (!/^\d{2}:\d{2}$/.test(time)) {
+      toast.error("Godzina musi być w formacie HH:MM");
+      return;
+    }
+
+    setBusy(true);
+    const { error } = await supabase
+      .from("study_events")
+      .update({
+        event_date: date,
+        event_time: time,
+        content: content.trim(),
+      })
+      .eq("id", event.id);
+    setBusy(false);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    toast.success("Zaktualizowano przypomnienie");
+    onSaved();
+  };
+
+  return (
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Edytuj termin nauki</DialogTitle>
+      </DialogHeader>
+      <View className="gap-3">
+        <View>
+          <Label>Data (RRRR-MM-DD)</Label>
+          <Input value={date} onChangeText={setDate} placeholder="2026-05-22" autoCapitalize="none" />
+        </View>
+        <View>
+          <Label>Godzina (HH:MM)</Label>
+          <Input value={time} onChangeText={setTime} placeholder="18:00" autoCapitalize="none" />
+        </View>
+        <View>
+          <Label>Treść</Label>
+          <Textarea value={content} onChangeText={setContent} placeholder="Np. powtórka pętli for" />
+        </View>
+        <View className="flex-row gap-2">
+          <Button variant="secondary" className="flex-1" onPress={onCanceled} disabled={busy}>
+            Anuluj
+          </Button>
+          <Button className="flex-1" onPress={save} loading={busy} disabled={busy || !content.trim()}>
+            Zakończ edycję
+          </Button>
+        </View>
       </View>
     </DialogContent>
   );
