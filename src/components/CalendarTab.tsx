@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Platform, View, Text, Pressable, ScrollView, Vibration } from "react-native";
 import { ChevronLeft, ChevronRight, Plus, Sparkles, Trash2, Bell } from "lucide-react-native";
 import Constants from "expo-constants";
+import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -669,6 +670,18 @@ function parseISODate(value: string) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function parseTimeValue(value: string) {
+  if (!/^\d{2}:\d{2}$/.test(value)) return null;
+  const [hours, minutes] = value.split(":").map(Number);
+  const date = new Date();
+  date.setHours(hours, minutes, 0, 0);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatTimeValue(date: Date) {
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
 function DatePickerField({
   label,
   value,
@@ -800,6 +813,102 @@ function DatePickerField({
   );
 }
 
+function TimePickerField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [tempTime, setTempTime] = useState(() => parseTimeValue(value) ?? parseTimeValue("18:00") ?? new Date());
+
+  useEffect(() => {
+    if (!open) setTempTime(parseTimeValue(value) ?? parseTimeValue("18:00") ?? new Date());
+  }, [open, value]);
+
+  const handleChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    if (Platform.OS === "android") {
+      if (event.type === "dismissed") {
+        setOpen(false);
+        return;
+      }
+
+      if (selectedDate) {
+        onChange(formatTimeValue(selectedDate));
+        setTempTime(selectedDate);
+      }
+      setOpen(false);
+      return;
+    }
+
+    if (selectedDate) setTempTime(selectedDate);
+  };
+
+  if (Platform.OS === "web") {
+    return (
+      <View>
+        <Label>{label}</Label>
+        <Input value={value} onChangeText={onChange} placeholder="18:00" autoCapitalize="none" />
+      </View>
+    );
+  }
+
+  return (
+    <View>
+      <Label>{label}</Label>
+      <Pressable
+        onPress={() => setOpen(true)}
+        className="mt-1 rounded-md border border-input bg-background px-3 py-3 active:opacity-80"
+      >
+        <Text className="text-sm text-foreground">{value}</Text>
+      </Pressable>
+
+      {Platform.OS === "ios" ? (
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Wybierz godzinę</DialogTitle>
+            </DialogHeader>
+
+            <View className="gap-3">
+              <DateTimePicker
+                value={tempTime}
+                mode="time"
+                display="spinner"
+                onChange={handleChange}
+                textColor="#f0ecf2"
+                themeVariant="dark"
+              />
+
+              <View className="flex-row gap-2">
+                <Button variant="secondary" className="flex-1" onPress={() => setOpen(false)}>
+                  Anuluj
+                </Button>
+                <Button
+                  className="flex-1"
+                  onPress={() => {
+                    onChange(formatTimeValue(tempTime));
+                    setOpen(false);
+                  }}
+                >
+                  Wybierz
+                </Button>
+              </View>
+            </View>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+
+      {Platform.OS === "android" && open ? (
+        <DateTimePicker value={tempTime} mode="time" display="default" onChange={handleChange} />
+      ) : null}
+    </View>
+  );
+}
+
 function getLocalApiBaseUrl() {
   const configured = process.env.EXPO_PUBLIC_API_URL?.trim();
   if (configured) return configured.replace(/\/$/, "");
@@ -866,10 +975,7 @@ function AddEventDialogBody({ onAdded }: { onAdded: () => void }) {
       </DialogHeader>
       <View className="gap-3">
         <DatePickerField label="Data" value={date} onChange={setDate} />
-        <View>
-          <Label>Godzina (HH:MM)</Label>
-          <Input value={time} onChangeText={setTime} placeholder="18:00" autoCapitalize="none" />
-        </View>
+        <TimePickerField label="Godzina" value={time} onChange={setTime} />
         <View>
           <Label>Treść</Label>
           <Textarea value={content} onChangeText={setContent} placeholder="Np. powtórka pętli for" />
