@@ -1,18 +1,38 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { View, Text, Pressable, ScrollView } from "react-native";
+import { ChevronLeft, ChevronRight, Plus, Sparkles, Trash2, Bell } from "lucide-react-native";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronRight, Plus, Sparkles, Trash2, Bell } from "lucide-react";
-import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { toast } from "@/components/ui/toast";
+import { cn } from "@/lib/utils";
 
-interface Event { id: string; event_date: string; event_time: string; content: string; }
+interface Event {
+  id: string;
+  event_date: string;
+  event_time: string;
+  content: string;
+}
 
 const PL_DAYS = ["Pn", "Wt", "Śr", "Cz", "Pt", "So", "Nd"];
-const PL_MONTHS = ["styczeń","luty","marzec","kwiecień","maj","czerwiec","lipiec","sierpień","wrzesień","październik","listopad","grudzień"];
+const PL_MONTHS = [
+  "styczeń",
+  "luty",
+  "marzec",
+  "kwiecień",
+  "maj",
+  "czerwiec",
+  "lipiec",
+  "sierpień",
+  "wrzesień",
+  "październik",
+  "listopad",
+  "grudzień",
+];
 
 export function CalendarTab() {
   const { user } = useAuth();
@@ -20,29 +40,31 @@ export function CalendarTab() {
   const [cursor, setCursor] = useState(new Date());
   const [openAdd, setOpenAdd] = useState(false);
   const [openAi, setOpenAi] = useState(false);
+  const notifiedRef = useRef<Set<string>>(new Set());
 
   const load = async () => {
     if (!user) return;
-    const { data } = await supabase.from("study_events").select("*").eq("user_id", user.id).order("event_date").order("event_time");
+    const { data } = await supabase
+      .from("study_events")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("event_date")
+      .order("event_time");
     setEvents((data ?? []) as Event[]);
   };
-  useEffect(() => { load(); }, [user]);
-
-  // Powiadomienia
   useEffect(() => {
-    if (!("Notification" in window)) return;
-    if (Notification.permission === "default") Notification.requestPermission();
-    const sent = new Set<string>();
+    load();
+  }, [user]);
+
+  useEffect(() => {
+    const sent = notifiedRef.current;
     const t = setInterval(() => {
       const now = new Date();
-      events.forEach(e => {
+      events.forEach((e) => {
         const dt = new Date(`${e.event_date}T${e.event_time}`);
         const diff = dt.getTime() - now.getTime();
         if (diff <= 0 && diff > -60_000 && !sent.has(e.id)) {
           sent.add(e.id);
-          if (Notification.permission === "granted") {
-            new Notification("C++ Quest — czas nauki!", { body: e.content });
-          }
           toast.info(`Czas nauki: ${e.content}`);
         }
       });
@@ -53,7 +75,7 @@ export function CalendarTab() {
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
   const firstDay = new Date(year, month, 1);
-  const startWeekday = (firstDay.getDay() + 6) % 7; // Pn=0
+  const startWeekday = (firstDay.getDay() + 6) % 7;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
   const grid = useMemo(() => {
@@ -66,171 +88,287 @@ export function CalendarTab() {
 
   const eventsByDate = useMemo(() => {
     const m = new Map<string, Event[]>();
-    events.forEach(e => {
-      const k = e.event_date;
-      m.set(k, [...(m.get(k) ?? []), e]);
+    events.forEach((e) => {
+      m.set(e.event_date, [...(m.get(e.event_date) ?? []), e]);
     });
     return m;
   }, [events]);
 
-  const dateKey = (d: number) => `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-  const todayKey = (() => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`; })();
+  const dateKey = (d: number) =>
+    `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  const todayKey = (() => {
+    const t = new Date();
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+  })();
+
+  const deleteEvent = async (id: string) => {
+    await supabase.from("study_events").delete().eq("id", id);
+    load();
+  };
 
   return (
-    <div className="px-5 py-6 pb-24">
-      <div className="flex items-center justify-between mb-4">
-        <button onClick={() => setCursor(new Date(year, month - 1, 1))} className="p-2 rounded-lg hover:bg-secondary"><ChevronLeft className="w-5 h-5" /></button>
-        <div className="font-bold text-lg capitalize">{PL_MONTHS[month]} {year}</div>
-        <button onClick={() => setCursor(new Date(year, month + 1, 1))} className="p-2 rounded-lg hover:bg-secondary"><ChevronRight className="w-5 h-5" /></button>
-      </div>
+    <ScrollView className="flex-1 bg-background" contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+      <View className="mb-4 flex-row items-center justify-between">
+        <Pressable
+          onPress={() => setCursor(new Date(year, month - 1, 1))}
+          className="rounded-lg p-2 active:bg-secondary"
+        >
+          <ChevronLeft color="#f0ecf2" size={20} />
+        </Pressable>
+        <Text className="text-lg font-bold capitalize text-foreground">
+          {PL_MONTHS[month]} {year}
+        </Text>
+        <Pressable
+          onPress={() => setCursor(new Date(year, month + 1, 1))}
+          className="rounded-lg p-2 active:bg-secondary"
+        >
+          <ChevronRight color="#f0ecf2" size={20} />
+        </Pressable>
+      </View>
 
-      <div className="grid grid-cols-7 gap-1 mb-1">
-        {PL_DAYS.map(d => <div key={d} className="text-xs text-muted-foreground text-center py-1">{d}</div>)}
-      </div>
-      <div className="grid grid-cols-7 gap-1 mb-5">
+      <View className="mb-1 flex-row">
+        {PL_DAYS.map((d) => (
+          <View key={d} style={{ flex: 1 }} className="py-1">
+            <Text className="text-center text-xs text-muted-foreground">{d}</Text>
+          </View>
+        ))}
+      </View>
+      <View className="mb-5 flex-row flex-wrap">
         {grid.map((d, i) => {
-          if (!d) return <div key={i} />;
+          if (!d) return <View key={i} style={{ width: `${100 / 7}%`, aspectRatio: 1, padding: 2 }} />;
           const k = dateKey(d);
           const has = eventsByDate.has(k);
           const isToday = k === todayKey;
           return (
-            <div key={i} className={`aspect-square rounded-lg border text-sm flex flex-col items-center justify-center ${isToday ? "border-primary bg-primary/10" : "border-border bg-card"}`}>
-              <span className="font-semibold">{d}</span>
-              {has && <span className="w-1.5 h-1.5 rounded-full bg-accent mt-0.5" />}
-            </div>
+            <View key={i} style={{ width: `${100 / 7}%`, aspectRatio: 1, padding: 2 }}>
+              <View
+                className={cn(
+                  "flex-1 items-center justify-center rounded-lg border",
+                  isToday ? "border-primary bg-primary/10" : "border-border bg-card",
+                )}
+              >
+                <Text className="text-sm font-semibold text-foreground">{d}</Text>
+                {has && <View className="mt-0.5 h-1.5 w-1.5 rounded-full bg-accent" />}
+              </View>
+            </View>
           );
         })}
-      </div>
+      </View>
 
-      <div className="flex gap-2 mb-4">
-        <Dialog open={openAdd} onOpenChange={setOpenAdd}>
-          <DialogTrigger asChild>
-            <Button className="flex-1"><Plus className="w-4 h-4 mr-1" /> Dodaj</Button>
-          </DialogTrigger>
-          <AddEventDialog onAdded={() => { setOpenAdd(false); load(); }} />
-        </Dialog>
-        <Dialog open={openAi} onOpenChange={setOpenAi}>
-          <DialogTrigger asChild>
-            <Button variant="secondary" className="flex-1"><Sparkles className="w-4 h-4 mr-1" /> Pomocnik AI</Button>
-          </DialogTrigger>
-          <AiPlannerDialog onPlanned={() => { setOpenAi(false); load(); }} />
-        </Dialog>
-      </div>
+      <View className="mb-4 flex-row gap-2">
+        <Button className="flex-1" onPress={() => setOpenAdd(true)}>
+          <Plus color="#fafafa" size={16} />
+          <Text className="text-sm font-semibold text-primary-foreground">Dodaj</Text>
+        </Button>
+        <Button variant="secondary" className="flex-1" onPress={() => setOpenAi(true)}>
+          <Sparkles color="#f0ecf2" size={16} />
+          <Text className="text-sm font-semibold text-secondary-foreground">Pomocnik AI</Text>
+        </Button>
+      </View>
 
-      <h3 className="font-bold mb-2">Nadchodzące przypomnienia</h3>
-      <div className="space-y-2">
+      <Text className="mb-2 font-bold text-foreground">Nadchodzące przypomnienia</Text>
+      <View className="gap-2">
         {events.length === 0 && (
-          <div className="text-sm text-muted-foreground bg-card border border-border rounded-xl p-4">
-            Brak zaplanowanej nauki. Dodaj termin lub poproś o plan AI.
-          </div>
+          <View className="rounded-xl border border-border bg-card p-4">
+            <Text className="text-sm text-muted-foreground">
+              Brak zaplanowanej nauki. Dodaj termin lub poproś o plan AI.
+            </Text>
+          </View>
         )}
-        {events.map(e => (
-          <div key={e.id} className="flex items-start gap-3 bg-card border border-border rounded-xl p-3">
-            <Bell className="w-4 h-4 mt-0.5 text-primary shrink-0" />
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold">{formatDate(e.event_date)} • {e.event_time.slice(0,5)}</div>
-              <div className="text-sm text-muted-foreground">{e.content}</div>
-            </div>
-            <button onClick={async () => { await supabase.from("study_events").delete().eq("id", e.id); load(); }}
-              className="p-1 text-muted-foreground hover:text-destructive"><Trash2 className="w-4 h-4" /></button>
-          </div>
+        {events.map((e) => (
+          <View key={e.id} className="flex-row items-start gap-3 rounded-xl border border-border bg-card p-3">
+            <Bell color="#a173e8" size={16} style={{ marginTop: 2 }} />
+            <View className="flex-1">
+              <Text className="text-sm font-semibold text-foreground">
+                {formatDate(e.event_date)} • {e.event_time.slice(0, 5)}
+              </Text>
+              <Text className="text-sm text-muted-foreground">{e.content}</Text>
+            </View>
+            <Pressable
+              onPress={() => deleteEvent(e.id)}
+              className="rounded p-1 active:opacity-60"
+            >
+              <Trash2 color="#a89fb5" size={16} />
+            </Pressable>
+          </View>
         ))}
-      </div>
-    </div>
+      </View>
+
+      <Dialog open={openAdd} onOpenChange={setOpenAdd}>
+        <AddEventDialogBody
+          onAdded={() => {
+            setOpenAdd(false);
+            load();
+          }}
+        />
+      </Dialog>
+
+      <Dialog open={openAi} onOpenChange={setOpenAi}>
+        <AiPlannerDialogBody
+          onPlanned={() => {
+            setOpenAi(false);
+            load();
+          }}
+        />
+      </Dialog>
+    </ScrollView>
   );
 }
 
 function formatDate(d: string) {
   const [y, m, day] = d.split("-").map(Number);
-  return `${String(day).padStart(2,"0")}.${String(m).padStart(2,"0")}.${y}`;
+  return `${String(day).padStart(2, "0")}.${String(m).padStart(2, "0")}.${y}`;
 }
 
-function AddEventDialog({ onAdded }: { onAdded: () => void }) {
+function todayISO() {
+  const t = new Date();
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+}
+
+function AddEventDialogBody({ onAdded }: { onAdded: () => void }) {
   const { user } = useAuth();
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(todayISO());
   const [time, setTime] = useState("18:00");
   const [content, setContent] = useState("");
   const [busy, setBusy] = useState(false);
 
   const save = async () => {
     if (!user || !content.trim()) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      toast.error("Data musi być w formacie RRRR-MM-DD");
+      return;
+    }
+    if (!/^\d{2}:\d{2}$/.test(time)) {
+      toast.error("Godzina musi być w formacie HH:MM");
+      return;
+    }
     setBusy(true);
     const { error } = await supabase.from("study_events").insert({
-      user_id: user.id, event_date: date, event_time: time, content: content.trim(),
+      user_id: user.id,
+      event_date: date,
+      event_time: time,
+      content: content.trim(),
     });
     setBusy(false);
     if (error) toast.error(error.message);
-    else { toast.success("Dodano przypomnienie"); onAdded(); }
+    else {
+      toast.success("Dodano przypomnienie");
+      onAdded();
+    }
   };
 
   return (
     <DialogContent>
-      <DialogHeader><DialogTitle>Nowy termin nauki</DialogTitle></DialogHeader>
-      <div className="space-y-3">
-        <div><Label>Data</Label><Input type="date" value={date} onChange={e => setDate(e.target.value)} /></div>
-        <div><Label>Godzina</Label><Input type="time" value={time} onChange={e => setTime(e.target.value)} /></div>
-        <div><Label>Treść</Label><Textarea value={content} onChange={e => setContent(e.target.value)} placeholder="Np. powtórka pętli for" /></div>
-        <Button className="w-full" onClick={save} disabled={busy || !content.trim()}>Zapisz</Button>
-      </div>
+      <DialogHeader>
+        <DialogTitle>Nowy termin nauki</DialogTitle>
+      </DialogHeader>
+      <View className="gap-3">
+        <View>
+          <Label>Data (RRRR-MM-DD)</Label>
+          <Input value={date} onChangeText={setDate} placeholder="2026-05-22" autoCapitalize="none" />
+        </View>
+        <View>
+          <Label>Godzina (HH:MM)</Label>
+          <Input value={time} onChangeText={setTime} placeholder="18:00" autoCapitalize="none" />
+        </View>
+        <View>
+          <Label>Treść</Label>
+          <Textarea value={content} onChangeText={setContent} placeholder="Np. powtórka pętli for" />
+        </View>
+        <Button onPress={save} loading={busy} disabled={busy || !content.trim()}>
+          Zapisz
+        </Button>
+      </View>
     </DialogContent>
   );
 }
 
-function AiPlannerDialog({ onPlanned }: { onPlanned: () => void }) {
+function AiPlannerDialogBody({ onPlanned }: { onPlanned: () => void }) {
   const { user } = useAuth();
-  const [prompt, setPrompt] = useState("Chcę uczyć się 30 minut dziennie, wieczorem w dni powszednie przez najbliższy tydzień.");
+  const [prompt, setPrompt] = useState(
+    "Chcę uczyć się 30 minut dziennie, wieczorem w dni powszednie przez najbliższy tydzień.",
+  );
   const [busy, setBusy] = useState(false);
   const [reply, setReply] = useState("");
   const [proposals, setProposals] = useState<{ date: string; time: string; content: string }[]>([]);
 
   const ask = async () => {
-    setBusy(true); setReply(""); setProposals([]);
+    setBusy(true);
+    setReply("");
+    setProposals([]);
     try {
-      const resp = await fetch("/api/public/ai-plan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
+      const { data, error } = await supabase.functions.invoke("ai-plan", {
+        body: { prompt },
       });
-      if (resp.status === 429) { toast.error("Za dużo prób, spróbuj za chwilę."); return; }
-      if (resp.status === 402) { toast.error("Brak kredytów AI. Doładuj w ustawieniach."); return; }
-      const json = await resp.json();
-      setReply(json.message ?? "");
-      setProposals(json.events ?? []);
+      if (error) {
+        if (error.message?.includes("429")) toast.error("Za dużo prób, spróbuj za chwilę.");
+        else if (error.message?.includes("402")) toast.error("Brak kredytów AI.");
+        else toast.error("Błąd AI: " + error.message);
+        return;
+      }
+      setReply(data?.message ?? "");
+      setProposals(data?.events ?? []);
     } catch (e: any) {
       toast.error("Błąd AI: " + e.message);
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   };
 
   const accept = async () => {
     if (!user) return;
-    const rows = proposals.map(p => ({ user_id: user.id, event_date: p.date, event_time: p.time, content: p.content }));
+    const rows = proposals.map((p) => ({
+      user_id: user.id,
+      event_date: p.date,
+      event_time: p.time,
+      content: p.content,
+    }));
     const { error } = await supabase.from("study_events").insert(rows);
     if (error) toast.error(error.message);
-    else { toast.success("Dodano plan nauki"); onPlanned(); }
+    else {
+      toast.success("Dodano plan nauki");
+      onPlanned();
+    }
   };
 
   return (
-    <DialogContent className="max-h-[85vh] overflow-y-auto">
-      <DialogHeader><DialogTitle>Pomocnik AI</DialogTitle></DialogHeader>
-      <div className="space-y-3">
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Pomocnik AI</DialogTitle>
+      </DialogHeader>
+      <View className="gap-3">
         <Label>Powiedz, kiedy chcesz się uczyć</Label>
-        <Textarea value={prompt} onChange={e => setPrompt(e.target.value)} rows={4} />
-        <Button className="w-full" onClick={ask} disabled={busy}>
-          <Sparkles className="w-4 h-4 mr-1" /> {busy ? "Myślę..." : "Zaproponuj plan"}
+        <Textarea value={prompt} onChangeText={setPrompt} numberOfLines={4} />
+        <Button onPress={ask} loading={busy} disabled={busy}>
+          <Sparkles color="#fafafa" size={16} />
+          <Text className="text-sm font-semibold text-primary-foreground">
+            {busy ? "Myślę..." : "Zaproponuj plan"}
+          </Text>
         </Button>
-        {reply && <div className="text-sm bg-secondary rounded-lg p-3 whitespace-pre-wrap">{reply}</div>}
-        {proposals.length > 0 && (
-          <div className="space-y-2">
-            <div className="font-semibold text-sm">Propozycje ({proposals.length}):</div>
-            {proposals.map((p, i) => (
-              <div key={i} className="text-xs bg-card border border-border rounded p-2">
-                <b>{p.date} {p.time}</b> — {p.content}
-              </div>
-            ))}
-            <Button className="w-full" onClick={accept}>Zapisz w kalendarzu</Button>
-          </div>
+        {!!reply && (
+          <View className="rounded-lg bg-secondary p-3">
+            <Text className="text-sm text-foreground">{reply}</Text>
+          </View>
         )}
-      </div>
+        {proposals.length > 0 && (
+          <View className="gap-2">
+            <Text className="text-sm font-semibold text-foreground">
+              Propozycje ({proposals.length}):
+            </Text>
+            {proposals.map((p, i) => (
+              <View key={i} className="rounded border border-border bg-card p-2">
+                <Text className="text-xs text-foreground">
+                  <Text className="font-bold">
+                    {p.date} {p.time}
+                  </Text>{" "}
+                  — {p.content}
+                </Text>
+              </View>
+            ))}
+            <Button onPress={accept}>Zapisz w kalendarzu</Button>
+          </View>
+        )}
+      </View>
     </DialogContent>
   );
 }

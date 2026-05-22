@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
+import { View, Text, Pressable, ScrollView } from "react-native";
+import { LogOut, Award } from "lucide-react-native";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
-import { medalsEarned, TIER_COLOR, type MedalTier } from "@/lib/medals";
+import { medalsEarned, TIER_COLOR_STOPS, type MedalTier } from "@/lib/medals";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { LogOut, Award } from "lucide-react";
 import { TRACKS } from "@/lib/cppCourse";
 
 export function ProfileTab() {
@@ -31,78 +32,120 @@ export function ProfileTab() {
   }, [user]);
 
   const medals = medalsEarned(levels);
-  const trackLabel = TRACKS.find(t => t.id === profile?.skill_level)?.label ?? "—";
+  const trackLabel = TRACKS.find((t) => t.id === profile?.skill_level)?.label ?? "—";
 
   return (
-    <div className="px-5 py-6 pb-24">
-      <div className="bg-card border border-border rounded-2xl p-5 mb-5 flex items-center gap-4">
-        <div className="w-14 h-14 rounded-full bg-primary/30 border border-primary flex items-center justify-center text-xl font-bold">
-          {profile?.nick?.[0]?.toUpperCase()}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="font-bold text-lg truncate">{profile?.nick}</div>
-          <div className="text-xs text-muted-foreground truncate">Poziom: {trackLabel}</div>
-        </div>
-        <Button variant="ghost" size="icon" onClick={signOut}><LogOut className="w-4 h-4" /></Button>
-      </div>
+    <ScrollView className="flex-1 bg-background" contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+      <View className="mb-5 flex-row items-center gap-4 rounded-2xl border border-border bg-card p-5">
+        <View className="h-14 w-14 items-center justify-center rounded-full border border-primary bg-primary/30">
+          <Text className="text-xl font-bold text-foreground">
+            {profile?.nick?.[0]?.toUpperCase() ?? "?"}
+          </Text>
+        </View>
+        <View className="flex-1">
+          <Text className="text-lg font-bold text-foreground" numberOfLines={1}>
+            {profile?.nick}
+          </Text>
+          <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+            Poziom: {trackLabel}
+          </Text>
+        </View>
+        <Button variant="ghost" size="icon" onPress={signOut}>
+          <LogOut color="#f0ecf2" size={18} />
+        </Button>
+      </View>
 
-      <div className="grid grid-cols-2 gap-3 mb-6">
+      <View className="mb-6 flex-row flex-wrap" style={{ gap: 12 }}>
         <Stat label="Ukończone poziomy" value={String(levels)} />
         <Stat label="Średnia z quizów" value={stats.quizzes ? `${stats.avg}%` : "—"} />
         <Stat label="Rozwiązane quizy" value={String(stats.quizzes)} />
         <Stat label="Medale" value={String(medals.length)} />
-      </div>
+      </View>
 
-      <h3 className="font-bold mb-3 flex items-center gap-2"><Award className="w-4 h-4 text-primary" /> Medale</h3>
+      <View className="mb-3 flex-row items-center gap-2">
+        <Award color="#a173e8" size={16} />
+        <Text className="font-bold text-foreground">Medale</Text>
+      </View>
       {medals.length === 0 ? (
-        <div className="text-sm text-muted-foreground bg-card border border-border rounded-xl p-4">
-          Ukończ 100 poziomów aby zdobyć pierwszy medal (Brąz). Z każdą setką poziomów dostajesz mocniejszy materiał: Brąz → Srebro → Złoto → Diament → Obsydian.
-        </div>
+        <View className="rounded-xl border border-border bg-card p-4">
+          <Text className="text-sm text-muted-foreground">
+            Ukończ 100 poziomów aby zdobyć pierwszy medal (Brąz). Z każdą setką poziomów dostajesz mocniejszy materiał: Brąz → Srebro → Złoto → Diament → Obsydian.
+          </Text>
+        </View>
       ) : (
-        <div className="grid grid-cols-3 gap-3">
+        <View className="flex-row flex-wrap" style={{ gap: 12 }}>
           {medals.map((m) => (
-            <button key={m.tier} onClick={() => setOpen(m.tier)} className="flex flex-col items-center gap-2">
-              <div
-                className="w-20 h-20 rounded-full border-4 border-border shadow-lg flex items-center justify-center"
-                style={{ background: TIER_COLOR[m.tier] }}
-              >
-                <Award className="w-8 h-8 text-foreground/70" />
-              </div>
-              <span className="text-xs font-semibold">{m.label}</span>
-            </button>
+            <Pressable
+              key={m.tier}
+              onPress={() => setOpen(m.tier)}
+              className="items-center"
+              style={{ width: "30%" }}
+            >
+              <Medal tier={m.tier} size={80} />
+              <Text className="mt-2 text-xs font-semibold text-foreground">{m.label}</Text>
+            </Pressable>
           ))}
-        </div>
+        </View>
       )}
 
-      <Dialog open={!!open} onOpenChange={() => setOpen(null)}>
-        <DialogContent>
-          {open && (
-            <>
-              <DialogHeader>
-                <DialogTitle>Medal: {medals.find(m => m.tier === open)?.label}</DialogTitle>
-              </DialogHeader>
-              <div className="flex flex-col items-center py-4">
-                <div className="w-28 h-28 rounded-full border-4 border-border shadow-2xl flex items-center justify-center mb-4"
-                  style={{ background: TIER_COLOR[open] }}>
-                  <Award className="w-12 h-12 text-foreground/70" />
-                </div>
-                <p className="text-center">
-                  Wykonałeś <b>{medals.find(m => m.tier === open)?.earnedAtLevels}</b> poziomów!
-                </p>
-              </div>
-            </>
-          )}
-        </DialogContent>
+      <Dialog open={!!open} onOpenChange={(v) => !v && setOpen(null)}>
+        {open && (
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Medal: {medals.find((m) => m.tier === open)?.label}</DialogTitle>
+            </DialogHeader>
+            <View className="items-center py-4">
+              <Medal tier={open} size={112} />
+              <Text className="mt-4 text-center text-foreground">
+                Wykonałeś{" "}
+                <Text className="font-bold">{medals.find((m) => m.tier === open)?.earnedAtLevels}</Text>{" "}
+                poziomów!
+              </Text>
+            </View>
+          </DialogContent>
+        )}
       </Dialog>
-    </div>
+    </ScrollView>
   );
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-card border border-border rounded-xl p-4">
-      <div className="text-2xl font-bold text-primary">{value}</div>
-      <div className="text-xs text-muted-foreground mt-1">{label}</div>
-    </div>
+    <View
+      className="rounded-xl border border-border bg-card p-4"
+      style={{ width: "47.5%" }}
+    >
+      <Text className="text-2xl font-bold text-primary">{value}</Text>
+      <Text className="mt-1 text-xs text-muted-foreground">{label}</Text>
+    </View>
+  );
+}
+
+function Medal({ tier, size }: { tier: MedalTier; size: number }) {
+  const [from, to] = TIER_COLOR_STOPS[tier];
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        borderWidth: 4,
+        borderColor: "#3a2f4a",
+        backgroundColor: from,
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
+      }}
+    >
+      <View
+        style={{
+          position: "absolute",
+          inset: 0,
+          backgroundColor: to,
+          opacity: 0.45,
+        }}
+      />
+      <Award color="rgba(15,10,20,0.7)" size={size * 0.4} />
+    </View>
   );
 }

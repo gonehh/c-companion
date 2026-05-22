@@ -1,10 +1,12 @@
 import { useState } from "react";
+import { View, Text, Pressable, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
+import { Code2 } from "lucide-react-native";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { toast } from "sonner";
-import { Code2 } from "lucide-react";
+import { toast } from "@/components/ui/toast";
+import { cn } from "@/lib/utils";
 
 export function AuthScreen() {
   const { signIn, signUp } = useAuth();
@@ -14,8 +16,8 @@ export function AuthScreen() {
   const [pw2, setPw2] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submit = async () => {
+    if (busy) return;
     setBusy(true);
     try {
       if (mode === "signup") {
@@ -36,49 +38,81 @@ export function AuthScreen() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6 py-10">
-      <div className="w-full max-w-sm">
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-primary/20 border border-primary/40 flex items-center justify-center mb-3">
-            <Code2 className="w-8 h-8 text-primary" />
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight">C++ Quest</h1>
-          <p className="text-sm text-muted-foreground mt-1">Nauka C++ krok po kroku</p>
-        </div>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      className="flex-1 bg-background"
+    >
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1, justifyContent: "center", paddingHorizontal: 24, paddingVertical: 40 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View className="w-full max-w-sm self-center">
+          <View className="mb-8 items-center">
+            <View className="mb-3 h-16 w-16 items-center justify-center rounded-2xl border border-primary/40 bg-primary/20">
+              <Code2 color="#a173e8" size={32} />
+            </View>
+            <Text className="text-2xl font-bold text-foreground">C++ Quest</Text>
+            <Text className="mt-1 text-sm text-muted-foreground">Nauka C++ krok po kroku</Text>
+          </View>
 
-        <div className="bg-card border border-border rounded-2xl p-6 shadow-xl">
-          <div className="flex gap-2 mb-5 p-1 bg-muted rounded-lg">
-            <button
-              onClick={() => setMode("login")}
-              className={`flex-1 py-2 text-sm rounded-md transition ${mode === "login" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-            >Logowanie</button>
-            <button
-              onClick={() => setMode("signup")}
-              className={`flex-1 py-2 text-sm rounded-md transition ${mode === "signup" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-            >Rejestracja</button>
-          </div>
+          <View className="rounded-2xl border border-border bg-card p-5">
+            <View className="mb-5 flex-row gap-2 rounded-lg bg-muted p-1">
+              <Pressable
+                onPress={() => setMode("login")}
+                className={cn(
+                  "flex-1 items-center rounded-md py-2",
+                  mode === "login" && "bg-primary",
+                )}
+              >
+                <Text
+                  className={cn(
+                    "text-sm",
+                    mode === "login" ? "text-primary-foreground font-semibold" : "text-muted-foreground",
+                  )}
+                >
+                  Logowanie
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setMode("signup")}
+                className={cn(
+                  "flex-1 items-center rounded-md py-2",
+                  mode === "signup" && "bg-primary",
+                )}
+              >
+                <Text
+                  className={cn(
+                    "text-sm",
+                    mode === "signup" ? "text-primary-foreground font-semibold" : "text-muted-foreground",
+                  )}
+                >
+                  Rejestracja
+                </Text>
+              </Pressable>
+            </View>
 
-          <form onSubmit={submit} className="space-y-4">
-            <div>
-              <Label htmlFor="nick">Nick</Label>
-              <Input id="nick" value={nick} onChange={(e) => setNick(e.target.value)} required maxLength={24} placeholder="np. olaCpp" />
-            </div>
-            <div>
-              <Label htmlFor="pw">Hasło</Label>
-              <Input id="pw" type="password" value={pw} onChange={(e) => setPw(e.target.value)} required minLength={6} />
-            </div>
-            {mode === "signup" && (
-              <div>
-                <Label htmlFor="pw2">Powtórz hasło</Label>
-                <Input id="pw2" type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} required minLength={6} />
-              </div>
-            )}
-            <Button type="submit" className="w-full" disabled={busy}>
-              {busy ? "Chwila..." : mode === "signup" ? "Stwórz konto" : "Zaloguj"}
-            </Button>
-          </form>
-        </div>
-      </div>
-    </div>
+            <View className="gap-4">
+              <View>
+                <Label>Nick</Label>
+                <Input value={nick} onChangeText={setNick} maxLength={24} placeholder="np. olaCpp" autoCapitalize="none" />
+              </View>
+              <View>
+                <Label>Hasło</Label>
+                <Input value={pw} onChangeText={setPw} secureTextEntry />
+              </View>
+              {mode === "signup" && (
+                <View>
+                  <Label>Powtórz hasło</Label>
+                  <Input value={pw2} onChangeText={setPw2} secureTextEntry />
+                </View>
+              )}
+              <Button onPress={submit} loading={busy} disabled={busy}>
+                {mode === "signup" ? "Stwórz konto" : "Zaloguj"}
+              </Button>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }

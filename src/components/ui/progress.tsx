@@ -1,25 +1,14 @@
-"use client";
-
-import * as React from "react";
-import * as ProgressPrimitive from "@radix-ui/react-progress";
-
+import { View } from "react-native";
 import { cn } from "@/lib/utils";
 
-const Progress = React.forwardRef<
-  React.ElementRef<typeof ProgressPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof ProgressPrimitive.Root>
->(({ className, value, ...props }, ref) => (
-  <ProgressPrimitive.Root
-    ref={ref}
-    className={cn("relative h-2 w-full overflow-hidden rounded-full bg-primary/20", className)}
-    {...props}
-  >
-    <ProgressPrimitive.Indicator
-      className="h-full w-full flex-1 bg-primary transition-all"
-      style={{ transform: `translateX(-${100 - (value || 0)}%)` }}
-    />
-  </ProgressPrimitive.Root>
-));
-Progress.displayName = ProgressPrimitive.Root.displayName;
-
-export { Progress };
+export function Progress({ value = 0, className }: { value?: number; className?: string }) {
+  const clamped = Math.max(0, Math.min(100, value));
+  return (
+    <View className={cn("h-2 w-full overflow-hidden rounded-full bg-secondary", className)}>
+      <View
+        className="h-full rounded-full bg-primary"
+        style={{ width: `${clamped}%` }}
+      />
+    </View>
+  );
+}

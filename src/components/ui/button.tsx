@@ -1,49 +1,67 @@
-import * as React from "react";
-import { Slot } from "@radix-ui/react-slot";
-import { cva, type VariantProps } from "class-variance-authority";
-
+import { forwardRef } from "react";
+import { Pressable, Text, ActivityIndicator, View, type PressableProps } from "react-native";
 import { cn } from "@/lib/utils";
 
-const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
-  {
-    variants: {
-      variant: {
-        default: "bg-primary text-primary-foreground shadow hover:bg-primary/90",
-        destructive: "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
-        outline:
-          "border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground",
-        secondary: "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
-      },
-      size: {
-        default: "h-9 px-4 py-2",
-        sm: "h-8 rounded-md px-3 text-xs",
-        lg: "h-10 rounded-md px-8",
-        icon: "h-9 w-9",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-      size: "default",
-    },
-  },
-);
+type Variant = "default" | "secondary" | "ghost" | "destructive" | "outline";
+type Size = "default" | "sm" | "lg" | "icon";
 
-export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
-  asChild?: boolean;
+interface ButtonProps extends Omit<PressableProps, "children"> {
+  variant?: Variant;
+  size?: Size;
+  loading?: boolean;
+  className?: string;
+  textClassName?: string;
+  children?: React.ReactNode;
 }
 
-const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
-    const Comp = asChild ? Slot : "button";
-    return (
-      <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props} />
-    );
-  },
-);
-Button.displayName = "Button";
+const variantContainer: Record<Variant, string> = {
+  default: "bg-primary active:opacity-80",
+  secondary: "bg-secondary active:opacity-80",
+  ghost: "bg-transparent active:bg-muted",
+  destructive: "bg-destructive active:opacity-80",
+  outline: "bg-transparent border border-border active:bg-muted",
+};
 
-export { Button, buttonVariants };
+const variantText: Record<Variant, string> = {
+  default: "text-primary-foreground",
+  secondary: "text-secondary-foreground",
+  ghost: "text-foreground",
+  destructive: "text-destructive-foreground",
+  outline: "text-foreground",
+};
+
+const sizeContainer: Record<Size, string> = {
+  default: "h-11 px-4 rounded-xl",
+  sm: "h-9 px-3 rounded-lg",
+  lg: "h-12 px-5 rounded-xl",
+  icon: "h-10 w-10 rounded-xl",
+};
+
+export const Button = forwardRef<View, ButtonProps>(function Button(
+  { variant = "default", size = "default", disabled, loading, className, textClassName, children, ...rest },
+  ref,
+) {
+  const isDisabled = disabled || loading;
+  return (
+    <Pressable
+      ref={ref}
+      disabled={isDisabled}
+      className={cn(
+        "flex-row items-center justify-center",
+        variantContainer[variant],
+        sizeContainer[size],
+        isDisabled && "opacity-50",
+        className,
+      )}
+      {...rest}
+    >
+      {loading ? (
+        <ActivityIndicator color="#fff" />
+      ) : typeof children === "string" ? (
+        <Text className={cn("text-sm font-semibold", variantText[variant], textClassName)}>{children}</Text>
+      ) : (
+        <View className="flex-row items-center gap-2">{children}</View>
+      )}
+    </Pressable>
+  );
+});

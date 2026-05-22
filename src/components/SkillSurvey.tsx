@@ -1,25 +1,28 @@
+import { View, Text, Pressable, ScrollView } from "react-native";
 import { TRACKS, type Track } from "@/lib/cppCourse";
 import { useAuth } from "@/lib/auth";
 
 export function SkillSurvey() {
   const { setSkillLevel } = useAuth();
   return (
-    <div className="px-5 py-8 max-w-md mx-auto">
-      <h2 className="text-2xl font-bold mb-2">Na jakim poziomie jesteś?</h2>
-      <p className="text-sm text-muted-foreground mb-6">Wybierz odpowiedź — dopasujemy poziom trudności.</p>
-      <div className="space-y-3">
-        {TRACKS.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setSkillLevel(t.id)}
-            className="w-full text-left p-4 rounded-xl border border-border bg-card hover:bg-secondary transition active:scale-[0.99]"
-          >
-            <div className="font-semibold">{t.label}</div>
-            <div className="text-sm text-muted-foreground mt-1">{t.desc}</div>
-          </button>
-        ))}
-      </div>
-    </div>
+    <ScrollView className="flex-1 bg-background" contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+      <View className="mx-auto w-full max-w-md">
+        <Text className="mb-2 text-2xl font-bold text-foreground">Na jakim poziomie jesteś?</Text>
+        <Text className="mb-6 text-sm text-muted-foreground">Wybierz odpowiedź — dopasujemy poziom trudności.</Text>
+        <View className="gap-3">
+          {TRACKS.map((t) => (
+            <Pressable
+              key={t.id}
+              onPress={() => setSkillLevel(t.id)}
+              className="rounded-xl border border-border bg-card p-4 active:bg-secondary"
+            >
+              <Text className="font-semibold text-foreground">{t.label}</Text>
+              <Text className="mt-1 text-sm text-muted-foreground">{t.desc}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+    </ScrollView>
   );
 }
 

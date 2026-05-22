@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "C++ Quest",
+    "slug": "cpp-quest",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "cppquest",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "dev.cppquest.app"
+    },
+    "android": {
+      "package": "dev.cppquest.app",
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
