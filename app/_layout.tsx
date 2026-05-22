@@ -6,6 +6,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useState } from "react";
 import { AuthProvider } from "@/lib/auth";
+import { ResponsiveProvider } from "@/lib/responsive";
 import { Toast } from "@/components/ui/toast";
 
 export default function RootLayout() {
@@ -14,14 +15,16 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <QueryClientProvider client={client}>
-          <AuthProvider>
-            <StatusBar style="light" />
-            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#1a1422" } }}>
-              <Stack.Screen name="index" />
-              <Stack.Screen name="(tabs)" />
-            </Stack>
-            <Toast />
-          </AuthProvider>
+          <ResponsiveProvider>
+            <AuthProvider>
+              <StatusBar style="light" />
+              <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#1a1422" } }}>
+                <Stack.Screen name="index" />
+                <Stack.Screen name="(tabs)" />
+              </Stack>
+              <Toast />
+            </AuthProvider>
+          </ResponsiveProvider>
         </QueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

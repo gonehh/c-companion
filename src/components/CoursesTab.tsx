@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "@/components/ui/toast";
+import { useResponsive, useScreenLayout } from "@/lib/responsive";
 import { cn } from "@/lib/utils";
 
 type ViewState =
@@ -17,6 +18,8 @@ type ViewState =
 
 export function CoursesTab() {
   const { profile, user } = useAuth();
+  const { breakpoint } = useResponsive();
+  const { padding, maxWidth } = useScreenLayout();
   const [completed, setCompleted] = useState<Set<number>>(new Set());
   const [quizDone, setQuizDone] = useState<Set<number>>(new Set());
   const [view, setView] = useState<ViewState>({ kind: "list" });
@@ -107,102 +110,112 @@ export function CoursesTab() {
     );
   }
 
+  const levelCols = breakpoint === "sm" ? 4 : breakpoint === "md" ? 6 : 8;
+
   return (
-    <ScrollView className="flex-1 bg-background" contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
-      <View className="mb-5">
-        <Text className="mb-1 text-xs uppercase tracking-wider text-primary">Twój tor</Text>
-        <Text className="text-xl font-bold text-foreground">{trackInfo.label}</Text>
-        <Text className="mt-1 text-sm text-muted-foreground">{trackInfo.desc}</Text>
-      </View>
-
-      <View className="mb-5 rounded-2xl border border-border bg-card p-4">
-        <View className="mb-2 flex-row items-center justify-between">
-          <Text className="text-sm text-muted-foreground">Postęp</Text>
-          <Text className="text-sm font-semibold text-foreground">{doneCount} / {total}</Text>
+    <ScrollView
+      className="flex-1 bg-background"
+      contentContainerStyle={{ padding, paddingBottom: padding * 2 }}
+    >
+      <View className="mx-auto w-full" style={maxWidth ? { maxWidth } : undefined}>
+        <View className="mb-5">
+          <Text className="mb-1 text-xs uppercase tracking-wider text-primary">Twój tor</Text>
+          <Text className="text-xl font-bold text-foreground">{trackInfo.label}</Text>
+          <Text className="mt-1 text-sm text-muted-foreground">{trackInfo.desc}</Text>
         </View>
-        <Progress value={(doneCount / total) * 100} />
-        {nextLevel && (
-          <Button
-            className="mt-4 w-full"
-            onPress={() => setView({ kind: "level", n: nextLevel })}
-            disabled={!isUnlocked(nextLevel)}
-          >
-            <Sparkles color="#fafafa" size={16} />
-            <Text className="text-sm font-semibold text-primary-foreground">
-              {isUnlocked(nextLevel) ? `Kontynuuj — Poziom ${nextLevel}` : "Najpierw quiz!"}
-            </Text>
-          </Button>
-        )}
-      </View>
 
-      {loading ? (
-        <Text className="py-10 text-center text-muted-foreground">Ładowanie...</Text>
-      ) : (
-        <View className="flex-row flex-wrap" style={{ gap: 8 }}>
-          {levels.map((lvl) => {
-            const done = completed.has(lvl.n);
-            const unlocked = isUnlocked(lvl.n);
-            const isQuizGate = lvl.n % 10 === 0;
+        <View className="mb-5 rounded-2xl border border-border bg-card p-4">
+          <View className="mb-2 flex-row items-center justify-between">
+            <Text className="text-sm text-muted-foreground">Postęp</Text>
+            <Text className="text-sm font-semibold text-foreground">
+              {doneCount} / {total}
+            </Text>
+          </View>
+          <Progress value={(doneCount / total) * 100} />
+          {nextLevel && (
+            <Button
+              className="mt-4 w-full"
+              onPress={() => setView({ kind: "level", n: nextLevel })}
+              disabled={!isUnlocked(nextLevel)}
+            >
+              <Sparkles color="#fafafa" size={16} />
+              <Text className="text-sm font-semibold text-primary-foreground">
+                {isUnlocked(nextLevel) ? `Kontynuuj — Poziom ${nextLevel}` : "Najpierw quiz!"}
+              </Text>
+            </Button>
+          )}
+        </View>
+
+        {loading ? (
+          <Text className="py-10 text-center text-muted-foreground">Ładowanie...</Text>
+        ) : (
+          <View className="flex-row flex-wrap -m-1">
+            {levels.map((lvl) => {
+              const done = completed.has(lvl.n);
+              const unlocked = isUnlocked(lvl.n);
+              const isQuizGate = lvl.n % 10 === 0;
+              return (
+                <View key={lvl.n} className="p-1" style={{ width: `${100 / levelCols}%` }}>
+                  <Pressable
+                    disabled={!unlocked}
+                    onPress={() => setView({ kind: "level", n: lvl.n })}
+                    style={{ aspectRatio: 1 }}
+                    className={cn(
+                      "items-center justify-center rounded-xl border",
+                      done
+                        ? "border-primary bg-primary/30"
+                        : unlocked
+                          ? "border-border bg-card active:bg-secondary"
+                          : "border-border bg-muted/50 opacity-50",
+                      isQuizGate && "border-2 border-accent/70",
+                    )}
+                  >
+                    {done ? (
+                      <CheckCircle2 color="#a173e8" size={14} />
+                    ) : !unlocked ? (
+                      <Lock color="#a89fb5" size={12} />
+                    ) : null}
+                    <Text
+                      className={cn(
+                        "text-sm font-semibold",
+                        done || unlocked ? "text-foreground" : "text-muted-foreground",
+                      )}
+                    >
+                      {lvl.n}
+                    </Text>
+                  </Pressable>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        <View className="mt-6 gap-2">
+          {Array.from({ length: 10 }).map((_, i) => {
+            const blockStart = i * 10 + 1;
+            const blockEnd = (i + 1) * 10;
+            const ready =
+              blockEnd <= doneCount ||
+              Array.from({ length: 10 }).every((_, k) => completed.has(blockStart + k));
+            const done = quizDone.has(i);
+            if (!ready) return null;
             return (
               <Pressable
-                key={lvl.n}
-                disabled={!unlocked}
-                onPress={() => setView({ kind: "level", n: lvl.n })}
-                style={{ width: "18.4%", aspectRatio: 1 }}
+                key={i}
+                onPress={() => setView({ kind: "quiz", index: i })}
                 className={cn(
-                  "items-center justify-center rounded-xl border",
-                  done
-                    ? "border-primary bg-primary/30"
-                    : unlocked
-                      ? "border-border bg-card active:bg-secondary"
-                      : "border-border bg-muted/50 opacity-50",
-                  isQuizGate && "border-2 border-accent/70",
+                  "flex-row items-center justify-between rounded-xl border p-3",
+                  done ? "border-primary/50 bg-primary/20" : "border-accent bg-accent/30",
                 )}
               >
-                {done ? (
-                  <CheckCircle2 color="#a173e8" size={14} />
-                ) : !unlocked ? (
-                  <Lock color="#a89fb5" size={12} />
-                ) : null}
-                <Text
-                  className={cn(
-                    "text-sm font-semibold",
-                    done || unlocked ? "text-foreground" : "text-muted-foreground",
-                  )}
-                >
-                  {lvl.n}
+                <Text className="font-semibold text-foreground">
+                  Quiz {i + 1} — poziomy {blockStart}–{blockEnd}
                 </Text>
+                <Text className="text-xs text-muted-foreground">{done ? "Zaliczony" : "Rozwiąż"}</Text>
               </Pressable>
             );
           })}
         </View>
-      )}
-
-      <View className="mt-6 gap-2">
-        {Array.from({ length: 10 }).map((_, i) => {
-          const blockStart = i * 10 + 1;
-          const blockEnd = (i + 1) * 10;
-          const ready =
-            blockEnd <= doneCount ||
-            Array.from({ length: 10 }).every((_, k) => completed.has(blockStart + k));
-          const done = quizDone.has(i);
-          if (!ready) return null;
-          return (
-            <Pressable
-              key={i}
-              onPress={() => setView({ kind: "quiz", index: i })}
-              className={cn(
-                "flex-row items-center justify-between rounded-xl border p-3",
-                done ? "border-primary/50 bg-primary/20" : "border-accent bg-accent/30",
-              )}
-            >
-              <Text className="font-semibold text-foreground">
-                Quiz {i + 1} — poziomy {blockStart}–{blockEnd}
-              </Text>
-              <Text className="text-xs text-muted-foreground">{done ? "Zaliczony" : "Rozwiąż"}</Text>
-            </Pressable>
-          );
-        })}
       </View>
     </ScrollView>
   );
@@ -217,12 +230,16 @@ function LevelView({
   onBack: () => void;
   onComplete: () => void;
 }) {
+  const { padding, maxWidth } = useScreenLayout();
   const [selected, setSelected] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState(false);
 
   return (
-    <ScrollView className="flex-1 bg-background" contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
-      <View className="mx-auto w-full max-w-md">
+    <ScrollView
+      className="flex-1 bg-background"
+      contentContainerStyle={{ padding, paddingBottom: padding * 2 }}
+    >
+      <View className="mx-auto w-full" style={maxWidth ? { maxWidth } : undefined}>
         <Pressable onPress={onBack} className="mb-4 flex-row items-center gap-1">
           <ArrowLeft color="#a89fb5" size={16} />
           <Text className="text-sm text-muted-foreground">wstecz</Text>
@@ -291,6 +308,7 @@ function QuizView({
   onBack: () => void;
   onDone: (correct: number) => void;
 }) {
+  const { padding, maxWidth } = useScreenLayout();
   const [i, setI] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
   const [answers, setAnswers] = useState<number[]>([]);
@@ -311,8 +329,11 @@ function QuizView({
   };
 
   return (
-    <ScrollView className="flex-1 bg-background" contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
-      <View className="mx-auto w-full max-w-md">
+    <ScrollView
+      className="flex-1 bg-background"
+      contentContainerStyle={{ padding, paddingBottom: padding * 2 }}
+    >
+      <View className="mx-auto w-full" style={maxWidth ? { maxWidth } : undefined}>
         <Pressable onPress={onBack} className="mb-4 flex-row items-center gap-1">
           <ArrowLeft color="#a89fb5" size={16} />
           <Text className="text-sm text-muted-foreground">wstecz</Text>

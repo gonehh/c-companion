@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, Pressable, ScrollView } from "react-native";
+import { Platform, View, Text, Pressable, ScrollView } from "react-native";
 import { ChevronLeft, ChevronRight, Plus, Sparkles, Trash2, Bell } from "lucide-react-native";
+import Constants from "expo-constants";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/toast";
+import { useScreenLayout } from "@/lib/responsive";
 import { cn } from "@/lib/utils";
 
 interface Event {
@@ -36,6 +38,7 @@ const PL_MONTHS = [
 
 export function CalendarTab() {
   const { user } = useAuth();
+  const { padding, maxWidth } = useScreenLayout();
   const [events, setEvents] = useState<Event[]>([]);
   const [cursor, setCursor] = useState(new Date());
   const [openAdd, setOpenAdd] = useState(false);
@@ -107,110 +110,112 @@ export function CalendarTab() {
   };
 
   return (
-    <ScrollView className="flex-1 bg-background" contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
-      <View className="mb-4 flex-row items-center justify-between">
-        <Pressable
-          onPress={() => setCursor(new Date(year, month - 1, 1))}
-          className="rounded-lg p-2 active:bg-secondary"
-        >
-          <ChevronLeft color="#f0ecf2" size={20} />
-        </Pressable>
-        <Text className="text-lg font-bold capitalize text-foreground">
-          {PL_MONTHS[month]} {year}
-        </Text>
-        <Pressable
-          onPress={() => setCursor(new Date(year, month + 1, 1))}
-          className="rounded-lg p-2 active:bg-secondary"
-        >
-          <ChevronRight color="#f0ecf2" size={20} />
-        </Pressable>
-      </View>
+    <ScrollView
+      className="flex-1 bg-background"
+      contentContainerStyle={{ padding, paddingBottom: padding * 2 }}
+    >
+      <View className="mx-auto w-full" style={maxWidth ? { maxWidth } : undefined}>
+        <View className="mb-4 flex-row items-center justify-between">
+          <Pressable
+            onPress={() => setCursor(new Date(year, month - 1, 1))}
+            className="rounded-lg p-2 active:bg-secondary"
+          >
+            <ChevronLeft color="#f0ecf2" size={20} />
+          </Pressable>
+          <Text className="text-lg font-bold capitalize text-foreground">
+            {PL_MONTHS[month]} {year}
+          </Text>
+          <Pressable
+            onPress={() => setCursor(new Date(year, month + 1, 1))}
+            className="rounded-lg p-2 active:bg-secondary"
+          >
+            <ChevronRight color="#f0ecf2" size={20} />
+          </Pressable>
+        </View>
 
-      <View className="mb-1 flex-row">
-        {PL_DAYS.map((d) => (
-          <View key={d} style={{ flex: 1 }} className="py-1">
-            <Text className="text-center text-xs text-muted-foreground">{d}</Text>
-          </View>
-        ))}
-      </View>
-      <View className="mb-5 flex-row flex-wrap">
-        {grid.map((d, i) => {
-          if (!d) return <View key={i} style={{ width: `${100 / 7}%`, aspectRatio: 1, padding: 2 }} />;
-          const k = dateKey(d);
-          const has = eventsByDate.has(k);
-          const isToday = k === todayKey;
-          return (
-            <View key={i} style={{ width: `${100 / 7}%`, aspectRatio: 1, padding: 2 }}>
-              <View
-                className={cn(
-                  "flex-1 items-center justify-center rounded-lg border",
-                  isToday ? "border-primary bg-primary/10" : "border-border bg-card",
-                )}
-              >
-                <Text className="text-sm font-semibold text-foreground">{d}</Text>
-                {has && <View className="mt-0.5 h-1.5 w-1.5 rounded-full bg-accent" />}
+        <View className="mb-1 flex-row">
+          {PL_DAYS.map((d) => (
+            <View key={d} style={{ flex: 1 }} className="py-1">
+              <Text className="text-center text-xs text-muted-foreground">{d}</Text>
+            </View>
+          ))}
+        </View>
+        <View className="mb-5 flex-row flex-wrap">
+          {grid.map((d, i) => {
+            if (!d) return <View key={i} style={{ width: `${100 / 7}%`, aspectRatio: 1, padding: 2 }} />;
+            const k = dateKey(d);
+            const has = eventsByDate.has(k);
+            const isToday = k === todayKey;
+            return (
+              <View key={i} style={{ width: `${100 / 7}%`, aspectRatio: 1, padding: 2 }}>
+                <View
+                  className={cn(
+                    "flex-1 items-center justify-center rounded-lg border",
+                    isToday ? "border-primary bg-primary/10" : "border-border bg-card",
+                  )}
+                >
+                  <Text className="text-sm font-semibold text-foreground">{d}</Text>
+                  {has && <View className="mt-0.5 h-1.5 w-1.5 rounded-full bg-accent" />}
+                </View>
               </View>
-            </View>
-          );
-        })}
-      </View>
+            );
+          })}
+        </View>
 
-      <View className="mb-4 flex-row gap-2">
-        <Button className="flex-1" onPress={() => setOpenAdd(true)}>
-          <Plus color="#fafafa" size={16} />
-          <Text className="text-sm font-semibold text-primary-foreground">Dodaj</Text>
-        </Button>
-        <Button variant="secondary" className="flex-1" onPress={() => setOpenAi(true)}>
-          <Sparkles color="#f0ecf2" size={16} />
-          <Text className="text-sm font-semibold text-secondary-foreground">Pomocnik AI</Text>
-        </Button>
-      </View>
+        <View className="mb-4 flex-row gap-2">
+          <Button className="flex-1" onPress={() => setOpenAdd(true)}>
+            <Plus color="#fafafa" size={16} />
+            <Text className="text-sm font-semibold text-primary-foreground">Dodaj</Text>
+          </Button>
+          <Button variant="secondary" className="flex-1" onPress={() => setOpenAi(true)}>
+            <Sparkles color="#f0ecf2" size={16} />
+            <Text className="text-sm font-semibold text-secondary-foreground">Pomocnik AI</Text>
+          </Button>
+        </View>
 
-      <Text className="mb-2 font-bold text-foreground">Nadchodzące przypomnienia</Text>
-      <View className="gap-2">
-        {events.length === 0 && (
-          <View className="rounded-xl border border-border bg-card p-4">
-            <Text className="text-sm text-muted-foreground">
-              Brak zaplanowanej nauki. Dodaj termin lub poproś o plan AI.
-            </Text>
-          </View>
-        )}
-        {events.map((e) => (
-          <View key={e.id} className="flex-row items-start gap-3 rounded-xl border border-border bg-card p-3">
-            <Bell color="#a173e8" size={16} style={{ marginTop: 2 }} />
-            <View className="flex-1">
-              <Text className="text-sm font-semibold text-foreground">
-                {formatDate(e.event_date)} • {e.event_time.slice(0, 5)}
+        <Text className="mb-2 font-bold text-foreground">Nadchodzące przypomnienia</Text>
+        <View className="gap-2">
+          {events.length === 0 && (
+            <View className="rounded-xl border border-border bg-card p-4">
+              <Text className="text-sm text-muted-foreground">
+                Brak zaplanowanej nauki. Dodaj termin lub poproś o plan AI.
               </Text>
-              <Text className="text-sm text-muted-foreground">{e.content}</Text>
             </View>
-            <Pressable
-              onPress={() => deleteEvent(e.id)}
-              className="rounded p-1 active:opacity-60"
-            >
-              <Trash2 color="#a89fb5" size={16} />
-            </Pressable>
-          </View>
-        ))}
+          )}
+          {events.map((e) => (
+            <View key={e.id} className="flex-row items-start gap-3 rounded-xl border border-border bg-card p-3">
+              <Bell color="#a173e8" size={16} style={{ marginTop: 2 }} />
+              <View className="flex-1">
+                <Text className="text-sm font-semibold text-foreground">
+                  {formatDate(e.event_date)} • {e.event_time.slice(0, 5)}
+                </Text>
+                <Text className="text-sm text-muted-foreground">{e.content}</Text>
+              </View>
+              <Pressable onPress={() => deleteEvent(e.id)} className="rounded p-1 active:opacity-60">
+                <Trash2 color="#a89fb5" size={16} />
+              </Pressable>
+            </View>
+          ))}
+        </View>
+
+        <Dialog open={openAdd} onOpenChange={setOpenAdd}>
+          <AddEventDialogBody
+            onAdded={() => {
+              setOpenAdd(false);
+              load();
+            }}
+          />
+        </Dialog>
+
+        <Dialog open={openAi} onOpenChange={setOpenAi}>
+          <AiPlannerDialogBody
+            onPlanned={() => {
+              setOpenAi(false);
+              load();
+            }}
+          />
+        </Dialog>
       </View>
-
-      <Dialog open={openAdd} onOpenChange={setOpenAdd}>
-        <AddEventDialogBody
-          onAdded={() => {
-            setOpenAdd(false);
-            load();
-          }}
-        />
-      </Dialog>
-
-      <Dialog open={openAi} onOpenChange={setOpenAi}>
-        <AiPlannerDialogBody
-          onPlanned={() => {
-            setOpenAi(false);
-            load();
-          }}
-        />
-      </Dialog>
     </ScrollView>
   );
 }
@@ -223,6 +228,33 @@ function formatDate(d: string) {
 function todayISO() {
   const t = new Date();
   return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+}
+
+function getLocalApiBaseUrl() {
+  const configured = process.env.EXPO_PUBLIC_API_URL?.trim();
+  if (configured) return configured.replace(/\/$/, "");
+
+  if (Platform.OS === "web") {
+    const host =
+      typeof window !== "undefined" && typeof window.location?.hostname === "string"
+        ? window.location.hostname
+        : "localhost";
+    return `http://${host}:8787`;
+  }
+
+  const hostUri =
+    (Constants.expoConfig as any)?.hostUri ??
+    (Constants as any)?.hostUri ??
+    (Constants as any)?.manifest2?.extra?.expoClient?.hostUri;
+  const host = typeof hostUri === "string" ? hostUri.split(":")[0] : null;
+
+  if (host) {
+    const effectiveHost = Platform.OS === "android" && host === "localhost" ? "10.0.2.2" : host;
+    return `http://${effectiveHost}:8787`;
+  }
+
+  if (Platform.OS === "android") return "http://10.0.2.2:8787";
+  return "http://localhost:8787";
 }
 
 function AddEventDialogBody({ onAdded }: { onAdded: () => void }) {
@@ -291,25 +323,78 @@ function AiPlannerDialogBody({ onPlanned }: { onPlanned: () => void }) {
   const [busy, setBusy] = useState(false);
   const [reply, setReply] = useState("");
   const [proposals, setProposals] = useState<{ date: string; time: string; content: string }[]>([]);
+  const [debugOpen, setDebugOpen] = useState(false);
+  const [debugText, setDebugText] = useState("");
 
   const ask = async () => {
     setBusy(true);
     setReply("");
     setProposals([]);
+    setDebugText("");
     try {
-      const { data, error } = await supabase.functions.invoke("ai-plan", {
-        body: { prompt },
+      const base = getLocalApiBaseUrl();
+      const planUrl = base ? `${base}/api/ai/plan` : "/api/ai/plan";
+
+      const startedAt = Date.now();
+      const resp = await fetch(planUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
       });
-      if (error) {
-        if (error.message?.includes("429")) toast.error("Za dużo prób, spróbuj za chwilę.");
-        else if (error.message?.includes("402")) toast.error("Brak kredytów AI.");
-        else toast.error("Błąd AI: " + error.message);
+
+      if (!resp.ok) {
+        if (resp.status === 429) toast.error("Za dużo prób, spróbuj za chwilę.");
+        else {
+          const t = await resp.text();
+          toast.error("Błąd AI: " + t);
+        }
+        setDebugText(
+          [
+            `url: ${planUrl}`,
+            `status: ${resp.status}`,
+            `ok: ${resp.ok}`,
+            `ms: ${Date.now() - startedAt}`,
+          ].join("\n"),
+        );
         return;
       }
+
+      const raw = await resp.text();
+      let data: any;
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        const hint = raw.trim().toLowerCase().startsWith("<!doctype") || raw.trim().startsWith("<html");
+        toast.error(
+          "Błąd AI (niepoprawna odpowiedź): " + (hint ? "HTML (sprawdź adres API w debug)" : raw),
+        );
+        setDebugText(
+          [
+            `url: ${planUrl}`,
+            `status: ${resp.status}`,
+            `ok: ${resp.ok}`,
+            `ms: ${Date.now() - startedAt}`,
+            `raw_len: ${raw.length}`,
+            `raw_head: ${raw.slice(0, 800)}`,
+          ].join("\n"),
+        );
+        return;
+      }
+      setDebugText(
+        [
+          `url: ${planUrl}`,
+          `status: ${resp.status}`,
+          `ok: ${resp.ok}`,
+          `ms: ${Date.now() - startedAt}`,
+          `raw_len: ${raw.length}`,
+          `keys: ${Object.keys(data ?? {}).join(",")}`,
+        ].join("\n"),
+      );
       setReply(data?.message ?? "");
       setProposals(data?.events ?? []);
     } catch (e: any) {
       toast.error("Błąd AI: " + e.message);
+      setDebugText(String(e?.stack ?? e?.message ?? e));
     } finally {
       setBusy(false);
     }
@@ -345,6 +430,16 @@ function AiPlannerDialogBody({ onPlanned }: { onPlanned: () => void }) {
             {busy ? "Myślę..." : "Zaproponuj plan"}
           </Text>
         </Button>
+        <Button variant="secondary" onPress={() => setDebugOpen((v) => !v)}>
+          <Text className="text-sm font-semibold text-secondary-foreground">
+            {debugOpen ? "Ukryj debug" : "Pokaż debug"}
+          </Text>
+        </Button>
+        {debugOpen && !!debugText && (
+          <View className="rounded-lg border border-border bg-card p-3">
+            <Text className="text-xs text-muted-foreground">{debugText}</Text>
+          </View>
+        )}
         {!!reply && (
           <View className="rounded-lg bg-secondary p-3">
             <Text className="text-sm text-foreground">{reply}</Text>
