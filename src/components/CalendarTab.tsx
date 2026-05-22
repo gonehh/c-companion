@@ -662,6 +662,144 @@ function todayISO() {
   return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
 }
 
+function parseISODate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function DatePickerField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [cursor, setCursor] = useState(() => parseISODate(value) ?? new Date());
+  const selectedDate = parseISODate(value) ?? new Date();
+  const year = cursor.getFullYear();
+  const month = cursor.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const startWeekday = (firstDay.getDay() + 6) % 7;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const todayKey = todayISO();
+  const selectedKey = value;
+
+  const grid = useMemo(() => {
+    const cells: (number | null)[] = [];
+    for (let i = 0; i < startWeekday; i++) cells.push(null);
+    for (let day = 1; day <= daysInMonth; day++) cells.push(day);
+    while (cells.length % 7 !== 0) cells.push(null);
+    return cells;
+  }, [daysInMonth, startWeekday]);
+
+  useEffect(() => {
+    if (!open) setCursor(parseISODate(value) ?? new Date());
+  }, [open, value]);
+
+  const selectDate = (day: number) => {
+    const nextValue = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    onChange(nextValue);
+    setOpen(false);
+  };
+
+  return (
+    <View>
+      <Label>{label}</Label>
+      <Pressable
+        onPress={() => {
+          setCursor(selectedDate);
+          setOpen(true);
+        }}
+        className="mt-1 rounded-md border border-input bg-background px-3 py-3 active:opacity-80"
+      >
+        <Text className="text-sm text-foreground">{formatDate(value)}</Text>
+      </Pressable>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Wybierz datę</DialogTitle>
+          </DialogHeader>
+
+          <View className="gap-3">
+            <View className="flex-row items-center justify-between">
+              <Pressable
+                onPress={() => setCursor(new Date(year, month - 1, 1))}
+                className="rounded-lg p-2 active:bg-secondary"
+              >
+                <ChevronLeft color="#f0ecf2" size={20} />
+              </Pressable>
+
+              <Text className="text-base font-bold capitalize text-foreground">
+                {PL_MONTHS[month]} {year}
+              </Text>
+
+              <Pressable
+                onPress={() => setCursor(new Date(year, month + 1, 1))}
+                className="rounded-lg p-2 active:bg-secondary"
+              >
+                <ChevronRight color="#f0ecf2" size={20} />
+              </Pressable>
+            </View>
+
+            <View className="flex-row">
+              {PL_DAYS.map((day) => (
+                <View key={day} style={{ flex: 1 }} className="py-1">
+                  <Text className="text-center text-xs text-muted-foreground">{day}</Text>
+                </View>
+              ))}
+            </View>
+
+            <View className="flex-row flex-wrap">
+              {grid.map((day, index) => {
+                if (!day) return <View key={index} style={{ width: `${100 / 7}%`, aspectRatio: 1, padding: 2 }} />;
+
+                const currentKey = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+                const isToday = currentKey === todayKey;
+                const isSelected = currentKey === selectedKey;
+
+                return (
+                  <View key={index} style={{ width: `${100 / 7}%`, aspectRatio: 1, padding: 2 }}>
+                    <Pressable
+                      onPress={() => selectDate(day)}
+                      className={cn(
+                        "flex-1 items-center justify-center rounded-lg border",
+                        isSelected
+                          ? "border-primary bg-primary"
+                          : isToday
+                            ? "border-primary bg-primary/10"
+                            : "border-border bg-card",
+                      )}
+                    >
+                      <Text
+                        className={cn(
+                          "text-sm font-semibold",
+                          isSelected ? "text-primary-foreground" : "text-foreground",
+                        )}
+                      >
+                        {day}
+                      </Text>
+                    </Pressable>
+                  </View>
+                );
+              })}
+            </View>
+
+            <Button variant="secondary" onPress={() => setOpen(false)}>
+              Anuluj
+            </Button>
+          </View>
+        </DialogContent>
+      </Dialog>
+    </View>
+  );
+}
+
 function getLocalApiBaseUrl() {
   const configured = process.env.EXPO_PUBLIC_API_URL?.trim();
   if (configured) return configured.replace(/\/$/, "");
@@ -727,10 +865,7 @@ function AddEventDialogBody({ onAdded }: { onAdded: () => void }) {
         <DialogTitle>Nowy termin nauki</DialogTitle>
       </DialogHeader>
       <View className="gap-3">
-        <View>
-          <Label>Data (RRRR-MM-DD)</Label>
-          <Input value={date} onChangeText={setDate} placeholder="2026-05-22" autoCapitalize="none" />
-        </View>
+        <DatePickerField label="Data" value={date} onChange={setDate} />
         <View>
           <Label>Godzina (HH:MM)</Label>
           <Input value={time} onChangeText={setTime} placeholder="18:00" autoCapitalize="none" />
@@ -804,10 +939,7 @@ function EditEventDialogBody({
         <DialogTitle>Edytuj termin nauki</DialogTitle>
       </DialogHeader>
       <View className="gap-3">
-        <View>
-          <Label>Data (RRRR-MM-DD)</Label>
-          <Input value={date} onChangeText={setDate} placeholder="2026-05-22" autoCapitalize="none" />
-        </View>
+        <DatePickerField label="Data" value={date} onChange={setDate} />
         <View>
           <Label>Godzina (HH:MM)</Label>
           <Input value={time} onChangeText={setTime} placeholder="18:00" autoCapitalize="none" />
