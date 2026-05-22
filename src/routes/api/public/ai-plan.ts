@@ -1,15 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-const SYSTEM = `Jesteś pomocnym asystentem nauki C++. Użytkownik powie ci kiedy chce się uczyć.
-Zaplanuj realistyczny harmonogram nauki (maks. 14 sesji). Odpowiadaj po polsku.
-Zawsze wywołuj funkcję propose_plan z listą sesji. Każda sesja: date (YYYY-MM-DD), time (HH:MM, 24h), content (krótki opis).`;
+type Mode = "suggest" | "evaluate" | "improve";
+
+const SYSTEMS: Record<Mode, string> = {
+  suggest: `Jesteś mentorem nauki C++. Zaproponuj realistyczny, zbalansowany harmonogram (max 14 sesji), z przerwami między dniami, krótkimi sesjami (20-45 min). Odpowiadaj po polsku. ZAWSZE wywołaj funkcję propose_plan z polem 'sessions' (lista) i 'summary' (krótka ocena).`,
+  evaluate: `Jesteś mentorem nauki C++. Użytkownik opisze swój plan nauki. Oceń go: czy jest realistyczny, czy ma przerwy (unikaj wypalenia), czy obciążenie dzienne jest sensowne. Wypisz mocne i słabe strony. Odpowiadaj po polsku. Wywołaj funkcję propose_plan: 'summary' = twoja ocena (kilka zdań, konkretnie), 'sessions' = pusta lista (nie proponujesz nowych sesji w trybie oceny).`,
+  improve: `Jesteś mentorem nauki C++. Użytkownik opisze swój plan. Popraw go: dodaj przerwy, zbalansuj dzienne obciążenie, rozłóż trudne tematy, unikaj wypalenia. Odpowiadaj po polsku. ZAWSZE wywołaj funkcję propose_plan z 'summary' (co poprawiłeś) i 'sessions' (poprawiony plan, max 14 sesji).`,
+};
 
 export const Route = createFileRoute("/api/public/ai-plan")({
   server: {
     handlers: {
       POST: async ({ request }) => {
         try {
-          const { prompt } = (await request.json()) as { prompt: string };
+          const body = (await request.json()) as { prompt?: string; mode?: Mode };
+          const prompt = body.prompt;
+          const mode: Mode = body.mode === "evaluate" || body.mode === "improve" ? body.mode : "suggest";
           if (!prompt || typeof prompt !== "string" || prompt.length > 2000) {
             return Response.json({ error: "Niepoprawne dane" }, { status: 400 });
           }
@@ -23,18 +29,18 @@ export const Route = createFileRoute("/api/public/ai-plan")({
             body: JSON.stringify({
               model: "google/gemini-3-flash-preview",
               messages: [
-                { role: "system", content: SYSTEM + `\nDzisiaj jest ${today}.` },
+                { role: "system", content: SYSTEMS[mode] + `\nDzisiaj jest ${today}.` },
                 { role: "user", content: prompt },
               ],
               tools: [{
                 type: "function",
                 function: {
                   name: "propose_plan",
-                  description: "Zwróć plan nauki",
+                  description: "Zwróć ocenę i/lub plan nauki",
                   parameters: {
                     type: "object",
                     properties: {
-                      summary: { type: "string", description: "Krótki opis planu po polsku" },
+                      summary: { type: "string", description: "Ocena lub opis planu po polsku" },
                       sessions: {
                         type: "array",
                         items: {
@@ -68,7 +74,7 @@ export const Route = createFileRoute("/api/public/ai-plan")({
 
           const data = await resp.json();
           const call = data.choices?.[0]?.message?.tool_calls?.[0];
-          let summary = "Oto proponowany plan nauki.";
+          let summary = "Oto odpowiedź mentora.";
           let sessions: any[] = [];
           if (call?.function?.arguments) {
             try {
@@ -77,7 +83,6 @@ export const Route = createFileRoute("/api/public/ai-plan")({
               sessions = Array.isArray(args.sessions) ? args.sessions : [];
             } catch (e) { console.error("parse args", e); }
           }
-          // walidacja
           const events = sessions
             .filter((s: any) => /^\d{4}-\d{2}-\d{2}$/.test(s.date) && /^\d{2}:\d{2}$/.test(s.time) && typeof s.content === "string")
             .slice(0, 14);
