@@ -396,19 +396,15 @@ function AiPlannerDialogBody({ onPlanned }: { onPlanned: () => void }) {
   const [busy, setBusy] = useState(false);
   const [reply, setReply] = useState("");
   const [proposals, setProposals] = useState<{ date: string; time: string; content: string }[]>([]);
-  const [debugOpen, setDebugOpen] = useState(false);
-  const [debugText, setDebugText] = useState("");
 
   const ask = async () => {
     setBusy(true);
     setReply("");
     setProposals([]);
-    setDebugText("");
     try {
       const base = getLocalApiBaseUrl();
       const planUrl = base ? `${base}/api/ai/plan` : "/api/ai/plan";
 
-      const startedAt = Date.now();
       const resp = await fetch(planUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -418,32 +414,18 @@ function AiPlannerDialogBody({ onPlanned }: { onPlanned: () => void }) {
       const raw = await resp.text();
       if (!resp.ok) {
         let errorMessage = "Błąd AI";
-        let errorDetails = "";
         try {
           const parsed = JSON.parse(raw);
           const parts = [parsed?.error, parsed?.details].filter(
             (value): value is string => typeof value === "string" && value.trim().length > 0,
           );
           if (parts.length > 0) errorMessage = parts.join(": ");
-          errorDetails =
-            typeof parsed?.details === "string" && parsed.details.trim() ? parsed.details.trim() : "";
         } catch {
           errorMessage =
             resp.status === 429 ? "Za dużo prób, spróbuj za chwilę." : `Błąd AI: ${raw || resp.status}`;
-          errorDetails = raw;
         }
 
         toast.error(errorMessage);
-        setDebugText(
-          [
-            `url: ${planUrl}`,
-            `status: ${resp.status}`,
-            `ok: ${resp.ok}`,
-            `ms: ${Date.now() - startedAt}`,
-            `raw_len: ${raw.length}`,
-            errorDetails ? `details: ${errorDetails.slice(0, 800)}` : `raw_head: ${raw.slice(0, 800)}`,
-          ].join("\n"),
-        );
         return;
       }
 
@@ -452,36 +434,13 @@ function AiPlannerDialogBody({ onPlanned }: { onPlanned: () => void }) {
         data = JSON.parse(raw);
       } catch {
         const hint = raw.trim().toLowerCase().startsWith("<!doctype") || raw.trim().startsWith("<html");
-        toast.error(
-          "Błąd AI (niepoprawna odpowiedź): " + (hint ? "HTML (sprawdź adres API w debug)" : raw),
-        );
-        setDebugText(
-          [
-            `url: ${planUrl}`,
-            `status: ${resp.status}`,
-            `ok: ${resp.ok}`,
-            `ms: ${Date.now() - startedAt}`,
-            `raw_len: ${raw.length}`,
-            `raw_head: ${raw.slice(0, 800)}`,
-          ].join("\n"),
-        );
+        toast.error("Błąd AI (niepoprawna odpowiedź): " + (hint ? "HTML" : raw));
         return;
       }
-      setDebugText(
-        [
-          `url: ${planUrl}`,
-          `status: ${resp.status}`,
-          `ok: ${resp.ok}`,
-          `ms: ${Date.now() - startedAt}`,
-          `raw_len: ${raw.length}`,
-          `keys: ${Object.keys(data ?? {}).join(",")}`,
-        ].join("\n"),
-      );
       setReply(data?.message ?? "");
       setProposals(data?.events ?? []);
     } catch (e: any) {
       toast.error("Błąd AI: " + e.message);
-      setDebugText(String(e?.stack ?? e?.message ?? e));
     } finally {
       setBusy(false);
     }
@@ -517,16 +476,6 @@ function AiPlannerDialogBody({ onPlanned }: { onPlanned: () => void }) {
             {busy ? "Myślę..." : "Zaproponuj plan"}
           </Text>
         </Button>
-        <Button variant="secondary" onPress={() => setDebugOpen((v) => !v)}>
-          <Text className="text-sm font-semibold text-secondary-foreground">
-            {debugOpen ? "Ukryj debug" : "Pokaż debug"}
-          </Text>
-        </Button>
-        {debugOpen && !!debugText && (
-          <View className="rounded-lg border border-border bg-card p-3">
-            <Text className="text-xs text-muted-foreground">{debugText}</Text>
-          </View>
-        )}
         {!!reply && (
           <View className="rounded-lg bg-secondary p-3">
             <Text className="text-sm text-foreground">{reply}</Text>
