@@ -342,24 +342,38 @@ function AiPlannerDialogBody({ onPlanned }: { onPlanned: () => void }) {
         body: JSON.stringify({ prompt }),
       });
 
+      const raw = await resp.text();
       if (!resp.ok) {
-        if (resp.status === 429) toast.error("Za dużo prób, spróbuj za chwilę.");
-        else {
-          const t = await resp.text();
-          toast.error("Błąd AI: " + t);
+        let errorMessage = "Błąd AI";
+        let errorDetails = "";
+        try {
+          const parsed = JSON.parse(raw);
+          const parts = [parsed?.error, parsed?.details].filter(
+            (value): value is string => typeof value === "string" && value.trim().length > 0,
+          );
+          if (parts.length > 0) errorMessage = parts.join(": ");
+          errorDetails =
+            typeof parsed?.details === "string" && parsed.details.trim() ? parsed.details.trim() : "";
+        } catch {
+          errorMessage =
+            resp.status === 429 ? "Za dużo prób, spróbuj za chwilę." : `Błąd AI: ${raw || resp.status}`;
+          errorDetails = raw;
         }
+
+        toast.error(errorMessage);
         setDebugText(
           [
             `url: ${planUrl}`,
             `status: ${resp.status}`,
             `ok: ${resp.ok}`,
             `ms: ${Date.now() - startedAt}`,
+            `raw_len: ${raw.length}`,
+            errorDetails ? `details: ${errorDetails.slice(0, 800)}` : `raw_head: ${raw.slice(0, 800)}`,
           ].join("\n"),
         );
         return;
       }
 
-      const raw = await resp.text();
       let data: any;
       try {
         data = JSON.parse(raw);
