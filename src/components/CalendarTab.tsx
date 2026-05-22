@@ -10,8 +10,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
+  clearPendingSnoozeRequest,
   ensureLocalNotificationPermissions,
+  getPendingSnoozeRequest,
   getDisabledStudyEventIds,
+  type PendingSnoozeRequest,
+  scheduleSnoozedNotification,
+  subscribeToPendingSnoozeRequest,
   syncStudyEventNotifications,
   toggleStudyEventNotificationEnabled,
 } from "@/lib/notifications";
@@ -52,11 +57,15 @@ export function CalendarTab() {
   const [openAi, setOpenAi] = useState(false);
   const [openClearAll, setOpenClearAll] = useState(false);
   const [openDeleteOne, setOpenDeleteOne] = useState(false);
+  const [openSnoozePrompt, setOpenSnoozePrompt] = useState(false);
   const [clearingAll, setClearingAll] = useState(false);
   const [deletingOne, setDeletingOne] = useState(false);
+  const [snoozing, setSnoozing] = useState(false);
   const [previewDateKey, setPreviewDateKey] = useState<string | null>(null);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [pendingDeleteEvent, setPendingDeleteEvent] = useState<Event | null>(null);
+  const [pendingSnoozeRequest, setPendingSnoozeRequest] = useState<PendingSnoozeRequest | null>(null);
+  const [snoozeMinutes, setSnoozeMinutes] = useState("10");
   const [disabledNotificationIds, setDisabledNotificationIds] = useState<string[]>([]);
   const [notificationsEnabled, setNotificationsEnabled] = useState(Platform.OS === "web");
   const notifiedRef = useRef<Set<string>>(new Set());
@@ -135,6 +144,38 @@ export function CalendarTab() {
       .then((ids) => setDisabledNotificationIds(ids))
       .catch(() => setDisabledNotificationIds([]));
   }, [events, user]);
+
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+
+    let active = true;
+
+    const openPrompt = (request: PendingSnoozeRequest | null) => {
+      if (!request || !active) return;
+
+      setPendingSnoozeRequest(request);
+      setSnoozeMinutes("10");
+      setOpenSnoozePrompt(true);
+      clearPendingSnoozeRequest().catch(() => {
+        // Ignore cleanup failures; the prompt is already visible to the user.
+      });
+    };
+
+    getPendingSnoozeRequest()
+      .then((request) => openPrompt(request))
+      .catch(() => {
+        // Ignore read failures; the listener below still handles fresh taps.
+      });
+
+    const unsubscribe = subscribeToPendingSnoozeRequest((request) => {
+      openPrompt(request);
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, []);
 
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
@@ -243,6 +284,29 @@ export function CalendarTab() {
       notifiedRef.current.delete(event.id);
       toast.info("Wyłączono powiadomienie");
     }
+  };
+
+  const handleSnoozeSubmit = async () => {
+    if (!pendingSnoozeRequest) return;
+
+    const minutes = Number.parseInt(snoozeMinutes.trim(), 10);
+    if (!Number.isFinite(minutes) || minutes <= 0) {
+      toast.error("Podaj liczbę minut większą od zera");
+      return;
+    }
+
+    setSnoozing(true);
+    const notificationId = await scheduleSnoozedNotification(pendingSnoozeRequest, minutes);
+    setSnoozing(false);
+
+    if (!notificationId) {
+      toast.error("Nie udało się przełożyć powiadomienia");
+      return;
+    }
+
+    setOpenSnoozePrompt(false);
+    setPendingSnoozeRequest(null);
+    toast.success(`Przełożono powiadomienie o ${minutes} min`);
   };
 
   return (
@@ -427,6 +491,59 @@ export function CalendarTab() {
               load();
             }}
           />
+        </Dialog>
+
+        <Dialog
+          open={openSnoozePrompt}
+          onOpenChange={(open) => {
+            setOpenSnoozePrompt(open);
+            if (!open && !snoozing) setPendingSnoozeRequest(null);
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Przełożyć powiadomienie?</DialogTitle>
+            </DialogHeader>
+            <View className="gap-3">
+              <Text className="text-sm text-muted-foreground">
+                {pendingSnoozeRequest?.content
+                  ? `Powiadomienie dotyczy: ${pendingSnoozeRequest.content}`
+                  : "Czy chcesz przełożyć to powiadomienie?"}
+              </Text>
+              <View>
+                <Label>Liczba minut</Label>
+                <Input
+                  value={snoozeMinutes}
+                  onChangeText={setSnoozeMinutes}
+                  placeholder="10"
+                  autoCapitalize="none"
+                  keyboardType="numeric"
+                />
+              </View>
+              <View className="flex-row gap-2">
+                <Button
+                  variant="secondary"
+                  className="flex-1"
+                  onPress={() => {
+                    setOpenSnoozePrompt(false);
+                    setPendingSnoozeRequest(null);
+                    setSnoozeMinutes("10");
+                  }}
+                  disabled={snoozing}
+                >
+                  Anuluj
+                </Button>
+                <Button
+                  className="flex-1"
+                  onPress={handleSnoozeSubmit}
+                  loading={snoozing}
+                  disabled={snoozing || !pendingSnoozeRequest}
+                >
+                  Przełóż
+                </Button>
+              </View>
+            </View>
+          </DialogContent>
         </Dialog>
 
         <Dialog

@@ -4,6 +4,7 @@ import { Platform } from "react-native";
 
 const STORAGE_KEY = "study-event-notification-ids";
 const DISABLED_STORAGE_KEY = "study-event-notification-disabled-ids";
+const PENDING_SNOOZE_STORAGE_KEY = "study-event-pending-snooze-request";
 const ANDROID_CHANNEL_ID = "study-reminders";
 
 export interface StudyEventNotification {
@@ -13,7 +14,26 @@ export interface StudyEventNotification {
   content: string;
 }
 
+export interface PendingSnoozeRequest {
+  eventId: string;
+  eventDate?: string;
+  eventTime?: string;
+  content: string;
+}
+
 type NotificationMap = Record<string, string>;
+type PendingSnoozeListener = (request: PendingSnoozeRequest | null) => void;
+
+const pendingSnoozeListeners = new Set<PendingSnoozeListener>();
+
+function emitPendingSnoozeRequest(request: PendingSnoozeRequest | null) {
+  pendingSnoozeListeners.forEach((listener) => listener(request));
+}
+
+export function subscribeToPendingSnoozeRequest(listener: PendingSnoozeListener) {
+  pendingSnoozeListeners.add(listener);
+  return () => pendingSnoozeListeners.delete(listener);
+}
 
 async function readDisabledIds() {
   if (!notificationsSupported()) return [] as string[];
@@ -27,6 +47,42 @@ async function readDisabledIds() {
   } catch {
     return [] as string[];
   }
+}
+
+async function readPendingSnoozeRequest() {
+  if (!notificationsSupported()) return null;
+
+  try {
+    const raw = await AsyncStorage.getItem(PENDING_SNOOZE_STORAGE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+
+    if (typeof parsed.eventId !== "string" || typeof parsed.content !== "string") return null;
+
+    return {
+      eventId: parsed.eventId,
+      eventDate: typeof parsed.eventDate === "string" ? parsed.eventDate : undefined,
+      eventTime: typeof parsed.eventTime === "string" ? parsed.eventTime : undefined,
+      content: parsed.content,
+    } satisfies PendingSnoozeRequest;
+  } catch {
+    return null;
+  }
+}
+
+async function writePendingSnoozeRequest(request: PendingSnoozeRequest | null) {
+  if (!notificationsSupported()) return;
+
+  if (!request) {
+    await AsyncStorage.removeItem(PENDING_SNOOZE_STORAGE_KEY);
+    emitPendingSnoozeRequest(null);
+    return;
+  }
+
+  await AsyncStorage.setItem(PENDING_SNOOZE_STORAGE_KEY, JSON.stringify(request));
+  emitPendingSnoozeRequest(request);
 }
 
 async function writeDisabledIds(ids: string[]) {
@@ -115,6 +171,11 @@ async function scheduleEventNotification(event: StudyEventNotification) {
     },
     trigger,
   });
+}
+
+function getSnoozeDate(minutes: number) {
+  const nextDate = new Date(Date.now() + minutes * 60_000);
+  return Number.isNaN(nextDate.getTime()) ? null : nextDate;
 }
 
 export async function ensureLocalNotificationPermissions() {
@@ -231,4 +292,69 @@ export async function toggleStudyEventNotificationEnabled(event: StudyEventNotif
 
   await writeDisabledIds([...disabledIds]);
   return enabled;
+}
+
+export async function getPendingSnoozeRequest() {
+  return readPendingSnoozeRequest();
+}
+
+export async function clearPendingSnoozeRequest() {
+  await writePendingSnoozeRequest(null);
+}
+
+export async function setPendingSnoozeRequestFromNotification(response: Notifications.NotificationResponse) {
+  if (!notificationsSupported()) return;
+
+  const request = response.notification.request;
+  const data = request.content.data ?? {};
+  const eventId =
+    typeof data.eventId === "string" && data.eventId.trim().length > 0 ? data.eventId : request.identifier;
+  const content =
+    typeof request.content.body === "string" && request.content.body.trim().length > 0
+      ? request.content.body.trim()
+      : "Masz zaplanowaną naukę.";
+
+  await writePendingSnoozeRequest({
+    eventId,
+    eventDate: typeof data.eventDate === "string" ? data.eventDate : undefined,
+    eventTime: typeof data.eventTime === "string" ? data.eventTime : undefined,
+    content,
+  });
+}
+
+export async function scheduleSnoozedNotification(request: PendingSnoozeRequest, minutes: number) {
+  if (!notificationsSupported()) return null;
+
+  const normalizedMinutes = Math.max(1, Math.round(minutes));
+  const date = getSnoozeDate(normalizedMinutes);
+  if (!date) return null;
+
+  await ensureAndroidChannel();
+
+  const trigger: Notifications.NotificationTriggerInput =
+    Platform.OS === "android"
+      ? {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date,
+          channelId: ANDROID_CHANNEL_ID,
+        }
+      : {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date,
+        };
+
+  return Notifications.scheduleNotificationAsync({
+    content: {
+      title: "Przypomnienie o nauce",
+      body: request.content,
+      sound: true,
+      data: {
+        eventId: request.eventId,
+        eventDate: request.eventDate,
+        eventTime: request.eventTime,
+        snoozed: true,
+      },
+    },
+    trigger,
+  });
 }
