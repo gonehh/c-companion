@@ -47,6 +47,7 @@ export function CalendarTab() {
   const [clearingAll, setClearingAll] = useState(false);
   const [previewDateKey, setPreviewDateKey] = useState<string | null>(null);
   const notifiedRef = useRef<Set<string>>(new Set());
+  const previewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = async () => {
     if (!user) return;
@@ -147,6 +148,12 @@ export function CalendarTab() {
     setPreviewDateKey(null);
   }, [cursor]);
 
+  useEffect(() => {
+    return () => {
+      if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
+    };
+  }, []);
+
   return (
     <ScrollView
       className="flex-1 bg-background"
@@ -192,11 +199,17 @@ export function CalendarTab() {
                 style={{ width: `${100 / 7}%`, aspectRatio: 1, padding: 2, zIndex: isPreviewOpen ? 30 : 1 }}
               >
                 <Pressable
-                  delayLongPress={250}
-                  onLongPress={() => {
-                    setPreviewDateKey(k);
+                  onPressIn={() => {
+                    if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
+                    previewTimeoutRef.current = setTimeout(() => {
+                      setPreviewDateKey(k);
+                    }, 250);
                   }}
                   onPressOut={() => {
+                    if (previewTimeoutRef.current) {
+                      clearTimeout(previewTimeoutRef.current);
+                      previewTimeoutRef.current = null;
+                    }
                     setPreviewDateKey((current) => (current === k ? null : current));
                   }}
                   className="flex-1"
