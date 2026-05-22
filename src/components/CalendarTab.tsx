@@ -45,7 +45,9 @@ export function CalendarTab() {
   const [openAi, setOpenAi] = useState(false);
   const [openClearAll, setOpenClearAll] = useState(false);
   const [clearingAll, setClearingAll] = useState(false);
+  const [previewDateKey, setPreviewDateKey] = useState<string | null>(null);
   const notifiedRef = useRef<Set<string>>(new Set());
+  const longPressTriggeredRef = useRef(false);
 
   const load = async () => {
     if (!user) return;
@@ -136,6 +138,16 @@ export function CalendarTab() {
     load();
   };
 
+  useEffect(() => {
+    if (previewDateKey && !eventsByDate.has(previewDateKey)) {
+      setPreviewDateKey(null);
+    }
+  }, [eventsByDate, previewDateKey]);
+
+  useEffect(() => {
+    setPreviewDateKey(null);
+  }, [cursor]);
+
   return (
     <ScrollView
       className="flex-1 bg-background"
@@ -171,19 +183,70 @@ export function CalendarTab() {
           {grid.map((d, i) => {
             if (!d) return <View key={i} style={{ width: `${100 / 7}%`, aspectRatio: 1, padding: 2 }} />;
             const k = dateKey(d);
-            const has = eventsByDate.has(k);
+            const dayEvents = eventsByDate.get(k) ?? [];
+            const has = dayEvents.length > 0;
             const isToday = k === todayKey;
+            const isPreviewOpen = previewDateKey === k && has;
             return (
-              <View key={i} style={{ width: `${100 / 7}%`, aspectRatio: 1, padding: 2 }}>
-                <View
+              <View
+                key={i}
+                style={{ width: `${100 / 7}%`, aspectRatio: 1, padding: 2, zIndex: isPreviewOpen ? 30 : 1 }}
+              >
+                <Pressable
+                  delayLongPress={250}
+                  onLongPress={() => {
+                    if (!has) return;
+                    longPressTriggeredRef.current = true;
+                    setPreviewDateKey((current) => (current === k ? null : k));
+                  }}
+                  onPress={() => {
+                    if (longPressTriggeredRef.current) {
+                      longPressTriggeredRef.current = false;
+                      return;
+                    }
+
+                    if (previewDateKey) setPreviewDateKey(null);
+                  }}
+                  className="flex-1"
+                >
+                  {isPreviewOpen && (
+                    <View
+                      className="absolute rounded-xl border border-border bg-card px-3 py-2"
+                      style={{
+                        bottom: "100%",
+                        left: "50%",
+                        width: 170,
+                        marginBottom: 8,
+                        transform: [{ translateX: -85 }],
+                        zIndex: 40,
+                      }}
+                    >
+                      <Text className="text-[11px] font-semibold uppercase tracking-wide text-primary">
+                        Zapisano przez użytkownika
+                      </Text>
+                      <Text className="mt-1 text-xs font-semibold text-foreground">{formatDate(k)}</Text>
+                      <View className="mt-2 gap-1">
+                        {dayEvents.map((event) => (
+                          <View key={event.id} className="rounded-lg bg-secondary px-2 py-1.5">
+                            <Text className="text-[11px] font-semibold text-foreground">
+                              Godzina: {event.event_time.slice(0, 5)}
+                            </Text>
+                            <Text className="text-[11px] text-muted-foreground">{event.content}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+                  <View
                   className={cn(
                     "flex-1 items-center justify-center rounded-lg border",
                     isToday ? "border-primary bg-primary/10" : "border-border bg-card",
                   )}
-                >
-                  <Text className="text-sm font-semibold text-foreground">{d}</Text>
-                  {has && <View className="mt-0.5 h-1.5 w-1.5 rounded-full bg-accent" />}
-                </View>
+                  >
+                    <Text className="text-sm font-semibold text-foreground">{d}</Text>
+                    {has && <View className="mt-0.5 h-1.5 w-1.5 rounded-full bg-accent" />}
+                  </View>
+                </Pressable>
               </View>
             );
           })}
