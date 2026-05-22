@@ -43,6 +43,8 @@ export function CalendarTab() {
   const [cursor, setCursor] = useState(new Date());
   const [openAdd, setOpenAdd] = useState(false);
   const [openAi, setOpenAi] = useState(false);
+  const [openClearAll, setOpenClearAll] = useState(false);
+  const [clearingAll, setClearingAll] = useState(false);
   const notifiedRef = useRef<Set<string>>(new Set());
 
   const load = async () => {
@@ -105,7 +107,32 @@ export function CalendarTab() {
   })();
 
   const deleteEvent = async (id: string) => {
-    await supabase.from("study_events").delete().eq("id", id);
+    const { error } = await supabase.from("study_events").delete().eq("id", id);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    notifiedRef.current.delete(id);
+    toast.success("Usunięto przypomnienie");
+    load();
+  };
+
+  const deleteAllEvents = async () => {
+    if (!user || events.length === 0) return;
+
+    setClearingAll(true);
+    const { error } = await supabase.from("study_events").delete().eq("user_id", user.id);
+    setClearingAll(false);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    notifiedRef.current.clear();
+    setOpenClearAll(false);
+    toast.success("Usunięto wszystkie przypomnienia");
     load();
   };
 
@@ -173,7 +200,18 @@ export function CalendarTab() {
           </Button>
         </View>
 
-        <Text className="mb-2 font-bold text-foreground">Nadchodzące przypomnienia</Text>
+        <View className="mb-2 flex-row items-center justify-between gap-3">
+          <Text className="font-bold text-foreground">Nadchodzące przypomnienia</Text>
+          <Button
+            variant="outline"
+            size="sm"
+            onPress={() => setOpenClearAll(true)}
+            disabled={events.length === 0}
+          >
+            <Trash2 color="#a89fb5" size={14} />
+            <Text className="text-sm font-semibold text-foreground">Usuń wszystkie</Text>
+          </Button>
+        </View>
         <View className="gap-2">
           {events.length === 0 && (
             <View className="rounded-xl border border-border bg-card p-4">
@@ -214,6 +252,38 @@ export function CalendarTab() {
               load();
             }}
           />
+        </Dialog>
+
+        <Dialog open={openClearAll} onOpenChange={setOpenClearAll}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Usunąć wszystkie przypomnienia?</DialogTitle>
+            </DialogHeader>
+            <View className="gap-3">
+              <Text className="text-sm text-muted-foreground">
+                Ta operacja usunie wszystkie zaplanowane przypomnienia z kalendarza.
+              </Text>
+              <View className="flex-row gap-2">
+                <Button
+                  variant="secondary"
+                  className="flex-1"
+                  onPress={() => setOpenClearAll(false)}
+                  disabled={clearingAll}
+                >
+                  Nie usuwaj
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="flex-1"
+                  onPress={deleteAllEvents}
+                  loading={clearingAll}
+                  disabled={clearingAll}
+                >
+                  Usuń wszystkie
+                </Button>
+              </View>
+            </View>
+          </DialogContent>
         </Dialog>
       </View>
     </ScrollView>
