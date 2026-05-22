@@ -1,17 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { isValidTrack, SkillSurvey } from "./SkillSurvey";
-import { buildLevels, buildQuiz, TRACKS } from "@/lib/cppCourse";
+import { buildLevels, buildQuiz, buildFinalExam, TRACKS } from "@/lib/cppCourse";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, CheckCircle2, Lock, Sparkles } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Lock, Sparkles, BookOpen, Lightbulb, GraduationCap, Trophy } from "lucide-react";
 import { toast } from "sonner";
 
 type View =
   | { kind: "list" }
   | { kind: "level"; n: number }
-  | { kind: "quiz"; index: number };
+  | { kind: "quiz"; index: number }
+  | { kind: "final" };
+
+// quiz_number używamy tak: 0..9 = quizy po 10 poziomach, 99 = egzamin końcowy
+const FINAL_EXAM_ID = 99;
 
 export function CoursesTab() {
   const { profile, user } = useAuth();
@@ -47,11 +51,9 @@ export function CoursesTab() {
     return null;
   })();
 
-  // gating: poziom dostępny gdy poprzedni ukończony; co 10 poziomów wymagany quiz
   const isUnlocked = (n: number) => {
     if (n === 1) return true;
     if (!completed.has(n - 1)) return false;
-    // jeśli n-1 jest wielokrotnością 10, wymagamy quizu o indeksie (n-1)/10 - 1
     if ((n - 1) % 10 === 0) {
       const qIdx = (n - 1) / 10 - 1;
       if (!quizDone.has(qIdx)) return false;
@@ -88,7 +90,7 @@ export function CoursesTab() {
     const qs = buildQuiz(track as any, view.index);
     return (
       <QuizView
-        index={view.index}
+        title={`Quiz ${view.index + 1} — poziomy ${view.index * 10 + 1}–${(view.index + 1) * 10}`}
         questions={qs}
         onBack={() => setView({ kind: "list" })}
         onDone={async (correct) => {
@@ -103,6 +105,30 @@ export function CoursesTab() {
       />
     );
   }
+
+  if (view.kind === "final") {
+    const qs = buildFinalExam(track as any);
+    return (
+      <QuizView
+        title="Egzamin końcowy — cały kurs C++"
+        questions={qs}
+        accent="primary"
+        onBack={() => setView({ kind: "list" })}
+        onDone={async (correct) => {
+          if (!user) return;
+          await supabase.from("quiz_attempts").insert({
+            user_id: user.id, quiz_number: FINAL_EXAM_ID, correct, total: qs.length,
+          });
+          await loadProgress();
+          toast.success(`Egzamin zakończony! Wynik: ${correct}/${qs.length}`);
+          setView({ kind: "list" });
+        }}
+      />
+    );
+  }
+
+  const allLevelsDone = doneCount === total;
+  const finalDone = quizDone.has(FINAL_EXAM_ID);
 
   return (
     <div className="px-5 py-6 pb-24">
@@ -125,12 +151,32 @@ export function CoursesTab() {
             disabled={!isUnlocked(nextLevel)}
           >
             <Sparkles className="w-4 h-4 mr-2" />
-            {completed.has(nextLevel - 1 || 0) && needsQuizAfter(nextLevel - 1)
+            {needsQuizAfter(nextLevel - 1)
               ? "Najpierw quiz!"
               : `Kontynuuj — Poziom ${nextLevel}`}
           </Button>
         )}
       </div>
+
+      {/* Egzamin końcowy */}
+      {allLevelsDone && (
+        <button
+          onClick={() => setView({ kind: "final" })}
+          className={`w-full mb-5 p-4 rounded-2xl border-2 flex items-center gap-3 text-left transition ${
+            finalDone
+              ? "bg-primary/20 border-primary"
+              : "bg-gradient-to-r from-primary/30 to-accent/30 border-primary animate-pulse"
+          }`}
+        >
+          <Trophy className="w-7 h-7 text-primary shrink-0" />
+          <div className="flex-1">
+            <div className="font-bold">Egzamin końcowy</div>
+            <div className="text-xs text-muted-foreground">
+              {finalDone ? "Zaliczony — możesz powtórzyć" : "Odblokowany! 20 pytań z całego kursu"}
+            </div>
+          </div>
+        </button>
+      )}
 
       {loading ? (
         <div className="text-center text-muted-foreground py-10">Ładowanie...</div>
@@ -161,22 +207,26 @@ export function CoursesTab() {
         </div>
       )}
 
-      {/* Quiz buttons */}
       <div className="mt-6 space-y-2">
         {Array.from({ length: 10 }).map((_, i) => {
           const blockStart = i * 10 + 1;
           const blockEnd = (i + 1) * 10;
-          const ready = blockEnd <= doneCount || Array.from({length:10}).every((_,k)=>completed.has(blockStart+k));
+          const ready = Array.from({ length: 10 }).every((_, k) => completed.has(blockStart + k));
           const done = quizDone.has(i);
           if (!ready) return null;
           return (
             <button
               key={i}
               onClick={() => setView({ kind: "quiz", index: i })}
-              className={`w-full p-3 rounded-xl border text-left flex items-center justify-between ${done ? "bg-primary/20 border-primary/50" : "bg-accent/30 border-accent"}`}
+              className={`w-full p-3 rounded-xl border text-left flex items-center justify-between ${
+                done ? "bg-primary/20 border-primary/50" : "bg-accent/30 border-accent"
+              }`}
             >
-              <span className="font-semibold">Quiz {i + 1} — poziomy {blockStart}–{blockEnd}</span>
-              <span className="text-xs text-muted-foreground">{done ? "Zaliczony" : "Rozwiąż"}</span>
+              <span className="font-semibold flex items-center gap-2">
+                <GraduationCap className="w-4 h-4" />
+                Quiz {i + 1} — poziomy {blockStart}–{blockEnd}
+              </span>
+              <span className="text-xs text-muted-foreground">{done ? "Zaliczony" : "5 pytań"}</span>
             </button>
           );
         })}
@@ -188,6 +238,7 @@ export function CoursesTab() {
 function LevelView({ level, onBack, onComplete }: { level: ReturnType<typeof buildLevels>[number]; onBack: () => void; onComplete: () => void }) {
   const [selected, setSelected] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [showQuestion, setShowQuestion] = useState(false);
 
   return (
     <div className="px-5 py-6 pb-24 max-w-md mx-auto">
@@ -195,48 +246,80 @@ function LevelView({ level, onBack, onComplete }: { level: ReturnType<typeof bui
         <ArrowLeft className="w-4 h-4" /> wstecz
       </button>
       <div className="text-xs text-primary uppercase tracking-wider mb-1">Poziom {level.n}</div>
-      <h2 className="text-xl font-bold mb-3">{level.title}</h2>
-      <p className="text-sm leading-relaxed mb-4">{level.lesson}</p>
+      <h2 className="text-2xl font-bold mb-4">{level.title}</h2>
+
+      {/* Sekcja: NAUKA */}
+      <div className="bg-card border border-border rounded-2xl p-4 mb-3">
+        <div className="flex items-center gap-2 text-primary text-xs uppercase tracking-wider mb-2 font-semibold">
+          <BookOpen className="w-4 h-4" /> Nauka
+        </div>
+        <p className="text-base leading-relaxed mb-3">{level.lesson}</p>
+        <div className="text-sm leading-relaxed text-foreground/90 whitespace-pre-line">{level.details}</div>
+      </div>
+
       {level.example && (
-        <pre className="bg-muted border border-border rounded-lg p-3 text-xs overflow-x-auto mb-5"><code>{level.example}</code></pre>
+        <div className="bg-card border border-border rounded-2xl p-4 mb-3">
+          <div className="text-xs uppercase tracking-wider text-accent mb-2 font-semibold">Przykład kodu</div>
+          <pre className="bg-muted/60 border border-border rounded-lg p-3 text-xs overflow-x-auto"><code>{level.example}</code></pre>
+        </div>
       )}
 
-      <div className="bg-card border border-border rounded-2xl p-4">
-        <div className="font-semibold mb-3">{level.question.q}</div>
-        <div className="space-y-2">
-          {level.question.options.map((o, i) => {
-            const isAns = i === level.question.answer;
-            const show = submitted;
-            return (
-              <button
-                key={i}
-                disabled={submitted}
-                onClick={() => setSelected(i)}
-                className={`w-full text-left p-3 rounded-lg border transition ${
-                  show && isAns ? "border-primary bg-primary/20"
-                  : show && selected === i && !isAns ? "border-destructive bg-destructive/20"
-                  : selected === i ? "border-primary bg-primary/10"
-                  : "border-border bg-secondary/40"
-                }`}
-              >{o}</button>
-            );
-          })}
+      {level.tip && (
+        <div className="bg-accent/15 border border-accent/40 rounded-2xl p-4 mb-4 flex gap-2">
+          <Lightbulb className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+          <p className="text-sm leading-relaxed">{level.tip}</p>
         </div>
-        {!submitted ? (
-          <Button className="w-full mt-4" disabled={selected === null} onClick={() => setSubmitted(true)}>
-            Sprawdź
-          </Button>
-        ) : (
-          <Button className="w-full mt-4" onClick={onComplete}>
-            {selected === level.question.answer ? "Świetnie! Dalej" : "Spróbuj kolejny poziom"}
-          </Button>
-        )}
-      </div>
+      )}
+
+      {!showQuestion ? (
+        <Button className="w-full" onClick={() => setShowQuestion(true)}>
+          Rozumiem — przejdź do pytania
+        </Button>
+      ) : (
+        <div className="bg-card border border-border rounded-2xl p-4">
+          <div className="text-xs uppercase tracking-wider text-primary mb-2 font-semibold">Sprawdź wiedzę</div>
+          <div className="font-semibold mb-3">{level.question.q}</div>
+          <div className="space-y-2">
+            {level.question.options.map((o, i) => {
+              const isAns = i === level.question.answer;
+              const show = submitted;
+              return (
+                <button
+                  key={i}
+                  disabled={submitted}
+                  onClick={() => setSelected(i)}
+                  className={`w-full text-left p-3 rounded-lg border transition ${
+                    show && isAns ? "border-primary bg-primary/20"
+                    : show && selected === i && !isAns ? "border-destructive bg-destructive/20"
+                    : selected === i ? "border-primary bg-primary/10"
+                    : "border-border bg-secondary/40"
+                  }`}
+                >{o}</button>
+              );
+            })}
+          </div>
+          {!submitted ? (
+            <Button className="w-full mt-4" disabled={selected === null} onClick={() => setSubmitted(true)}>
+              Sprawdź
+            </Button>
+          ) : (
+            <Button className="w-full mt-4" onClick={onComplete}>
+              {selected === level.question.answer ? "Świetnie! Dalej" : "Spróbuj kolejny poziom"}
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-function QuizView({ index, questions, onBack, onDone }: { index: number; questions: ReturnType<typeof buildQuiz>; onBack: () => void; onDone: (correct: number) => void }) {
+function QuizView({ title, questions, onBack, onDone, accent = "accent" }: {
+  title: string;
+  questions: { q: string; options: string[]; answer: number }[];
+  onBack: () => void;
+  onDone: (correct: number) => void;
+  accent?: "accent" | "primary";
+}) {
   const [i, setI] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
   const [answers, setAnswers] = useState<number[]>([]);
@@ -261,7 +344,7 @@ function QuizView({ index, questions, onBack, onDone }: { index: number; questio
       <button onClick={onBack} className="flex items-center gap-1 text-sm text-muted-foreground mb-4">
         <ArrowLeft className="w-4 h-4" /> wstecz
       </button>
-      <div className="text-xs text-accent uppercase tracking-wider mb-1">Quiz {index + 1}</div>
+      <div className={`text-xs uppercase tracking-wider mb-1 ${accent === "primary" ? "text-primary" : "text-accent"}`}>{title}</div>
       <h2 className="text-xl font-bold mb-4">Pytanie {i + 1} / {questions.length}</h2>
       <div className="bg-card border border-border rounded-2xl p-4">
         <div className="font-semibold mb-3">{q.q}</div>
@@ -275,7 +358,7 @@ function QuizView({ index, questions, onBack, onDone }: { index: number; questio
           ))}
         </div>
         <Button className="w-full mt-4" disabled={selected === null} onClick={next}>
-          {last ? "Zakończ quiz" : "Dalej"}
+          {last ? "Zakończ" : "Dalej"}
         </Button>
       </div>
     </div>
