@@ -227,7 +227,7 @@ export function CalendarTab() {
   };
 
   const handleNotificationToggle = async (event: Event) => {
-    Vibration.vibrate(20);
+    Vibration.vibrate(10);
 
     const nextEnabled = disabledNotificationSet.has(event.id);
     const enabled = await toggleStudyEventNotificationEnabled(event, nextEnabled);
@@ -394,8 +394,8 @@ export function CalendarTab() {
                 <Bell color={disabledNotificationSet.has(e.id) ? "#a89fb5" : "#a173e8"} size={18} />
                 {disabledNotificationSet.has(e.id) && (
                   <View
-                    className="absolute h-0.5 w-7 rounded-full bg-destructive"
-                    style={{ transform: [{ rotate: "-38deg" }] }}
+                    className="absolute h-0.5 w-6 rounded-full bg-destructive"
+                    style={{ transform: [{ rotate: "38deg" }] }}
                   />
                 )}
               </Pressable>
