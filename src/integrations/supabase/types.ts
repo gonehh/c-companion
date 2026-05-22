@@ -14,13 +14,108 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      level_progress: {
+        Row: {
+          completed_at: string
+          id: string
+          level_number: number
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string
+          id?: string
+          level_number: number
+          user_id: string
+        }
+        Update: {
+          completed_at?: string
+          id?: string
+          level_number?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          id: string
+          nick: string
+          skill_level: string | null
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          nick: string
+          skill_level?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          nick?: string
+          skill_level?: string | null
+        }
+        Relationships: []
+      }
+      quiz_attempts: {
+        Row: {
+          correct: number
+          created_at: string
+          id: string
+          quiz_number: number
+          total: number
+          user_id: string
+        }
+        Insert: {
+          correct: number
+          created_at?: string
+          id?: string
+          quiz_number: number
+          total: number
+          user_id: string
+        }
+        Update: {
+          correct?: number
+          created_at?: string
+          id?: string
+          quiz_number?: number
+          total?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      study_events: {
+        Row: {
+          content: string
+          created_at: string
+          event_date: string
+          event_time: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          event_date: string
+          event_time: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          event_date?: string
+          event_time?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      nick_exists: { Args: { _nick: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
