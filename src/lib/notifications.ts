@@ -3,6 +3,7 @@ import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 
 const STORAGE_KEY = "study-event-notification-ids";
+const DISABLED_STORAGE_KEY = "study-event-notification-disabled-ids";
 const ANDROID_CHANNEL_ID = "study-reminders";
 
 export interface StudyEventNotification {
@@ -13,6 +14,32 @@ export interface StudyEventNotification {
 }
 
 type NotificationMap = Record<string, string>;
+
+async function readDisabledIds() {
+  if (!notificationsSupported()) return [] as string[];
+
+  try {
+    const raw = await AsyncStorage.getItem(DISABLED_STORAGE_KEY);
+    if (!raw) return [] as string[];
+
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : [];
+  } catch {
+    return [] as string[];
+  }
+}
+
+async function writeDisabledIds(ids: string[]) {
+  if (!notificationsSupported()) return;
+
+  const uniqueIds = [...new Set(ids)];
+  if (uniqueIds.length === 0) {
+    await AsyncStorage.removeItem(DISABLED_STORAGE_KEY);
+    return;
+  }
+
+  await AsyncStorage.setItem(DISABLED_STORAGE_KEY, JSON.stringify(uniqueIds));
+}
 
 function notificationsSupported() {
   return Platform.OS !== "web";
@@ -107,14 +134,18 @@ export async function syncStudyEventNotifications(events: StudyEventNotification
 
   const granted = await ensureLocalNotificationPermissions();
   const storedMap = await readNotificationMap();
+  const disabledIds = new Set(await readDisabledIds());
   const nextMap: NotificationMap = { ...storedMap };
   const eventsById = new Map(events.map((event) => [event.id, event]));
+  const validEventIds = new Set(events.map((event) => event.id));
+
+  await writeDisabledIds([...disabledIds].filter((eventId) => validEventIds.has(eventId)));
 
   for (const [eventId, notificationId] of Object.entries(storedMap)) {
     const event = eventsById.get(eventId);
     const eventDate = event ? getEventDate(event) : null;
 
-    if (!event || !eventDate || eventDate.getTime() <= Date.now()) {
+    if (!event || !eventDate || eventDate.getTime() <= Date.now() || disabledIds.has(eventId)) {
       try {
         await Notifications.cancelScheduledNotificationAsync(notificationId);
       } catch {
@@ -131,7 +162,7 @@ export async function syncStudyEventNotifications(events: StudyEventNotification
 
   for (const event of events) {
     const eventDate = getEventDate(event);
-    if (!eventDate || eventDate.getTime() <= Date.now() || nextMap[event.id]) continue;
+    if (!eventDate || eventDate.getTime() <= Date.now() || nextMap[event.id] || disabledIds.has(event.id)) continue;
 
     const notificationId = await scheduleEventNotification(event);
     if (notificationId) nextMap[event.id] = notificationId;
@@ -153,4 +184,51 @@ export async function clearScheduledStudyNotifications() {
   }
 
   await writeNotificationMap({});
+}
+
+export async function getDisabledStudyEventIds(events?: StudyEventNotification[]) {
+  const disabledIds = await readDisabledIds();
+  if (!events) return disabledIds;
+
+  const validEventIds = new Set(events.map((event) => event.id));
+  const filteredIds = disabledIds.filter((eventId) => validEventIds.has(eventId));
+  if (filteredIds.length !== disabledIds.length) await writeDisabledIds(filteredIds);
+  return filteredIds;
+}
+
+export async function toggleStudyEventNotificationEnabled(event: StudyEventNotification, enabled: boolean) {
+  if (!notificationsSupported()) return enabled;
+
+  const disabledIds = new Set(await readDisabledIds());
+  const notificationMap = await readNotificationMap();
+
+  if (enabled) disabledIds.delete(event.id);
+  else disabledIds.add(event.id);
+
+  const existingNotificationId = notificationMap[event.id];
+  if (!enabled && existingNotificationId) {
+    try {
+      await Notifications.cancelScheduledNotificationAsync(existingNotificationId);
+    } catch {
+      // Ignore invalid ids and just update local state below.
+    }
+    delete notificationMap[event.id];
+    await writeNotificationMap(notificationMap);
+  }
+
+  if (enabled) {
+    const granted = await ensureLocalNotificationPermissions();
+    const eventDate = getEventDate(event);
+
+    if (granted && eventDate && eventDate.getTime() > Date.now() && !notificationMap[event.id]) {
+      const notificationId = await scheduleEventNotification(event);
+      if (notificationId) {
+        notificationMap[event.id] = notificationId;
+        await writeNotificationMap(notificationMap);
+      }
+    }
+  }
+
+  await writeDisabledIds([...disabledIds]);
+  return enabled;
 }

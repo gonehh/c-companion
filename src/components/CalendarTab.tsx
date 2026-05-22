@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Platform, View, Text, Pressable, ScrollView } from "react-native";
+import { Platform, View, Text, Pressable, ScrollView, Vibration } from "react-native";
 import { ChevronLeft, ChevronRight, Plus, Sparkles, Trash2, Bell } from "lucide-react-native";
 import Constants from "expo-constants";
 import { useAuth } from "@/lib/auth";
@@ -9,7 +9,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ensureLocalNotificationPermissions, syncStudyEventNotifications } from "@/lib/notifications";
+import {
+  ensureLocalNotificationPermissions,
+  getDisabledStudyEventIds,
+  syncStudyEventNotifications,
+  toggleStudyEventNotificationEnabled,
+} from "@/lib/notifications";
 import { toast } from "@/components/ui/toast";
 import { useScreenLayout } from "@/lib/responsive";
 import { cn } from "@/lib/utils";
@@ -52,6 +57,7 @@ export function CalendarTab() {
   const [previewDateKey, setPreviewDateKey] = useState<string | null>(null);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [pendingDeleteEvent, setPendingDeleteEvent] = useState<Event | null>(null);
+  const [disabledNotificationIds, setDisabledNotificationIds] = useState<string[]>([]);
   const [notificationsEnabled, setNotificationsEnabled] = useState(Platform.OS === "web");
   const notifiedRef = useRef<Set<string>>(new Set());
   const previewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -92,11 +98,14 @@ export function CalendarTab() {
     };
   }, [user]);
 
+  const disabledNotificationSet = useMemo(() => new Set(disabledNotificationIds), [disabledNotificationIds]);
+
   useEffect(() => {
     const sent = notifiedRef.current;
     const t = setInterval(() => {
       const now = new Date();
       events.forEach((e) => {
+        if (disabledNotificationSet.has(e.id)) return;
         const dt = new Date(`${e.event_date}T${e.event_time}`);
         const diff = dt.getTime() - now.getTime();
         if (diff <= 0 && diff > -60_000 && !sent.has(e.id)) {
@@ -106,7 +115,7 @@ export function CalendarTab() {
       });
     }, 30_000);
     return () => clearInterval(t);
-  }, [events]);
+  }, [disabledNotificationSet, events]);
 
   useEffect(() => {
     if (!user || !notificationsEnabled) return;
@@ -115,6 +124,17 @@ export function CalendarTab() {
       console.error("Nie udalo sie zsynchronizowac powiadomien lokalnych", error);
     });
   }, [events, notificationsEnabled, user]);
+
+  useEffect(() => {
+    if (!user || Platform.OS === "web") {
+      setDisabledNotificationIds([]);
+      return;
+    }
+
+    getDisabledStudyEventIds(events)
+      .then((ids) => setDisabledNotificationIds(ids))
+      .catch(() => setDisabledNotificationIds([]));
+  }, [events, user]);
 
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
@@ -204,6 +224,25 @@ export function CalendarTab() {
     }
 
     lastReminderTapRef.current = { id: event.id, at: now };
+  };
+
+  const handleNotificationToggle = async (event: Event) => {
+    Vibration.vibrate(20);
+
+    const nextEnabled = disabledNotificationSet.has(event.id);
+    const enabled = await toggleStudyEventNotificationEnabled(event, nextEnabled);
+
+    setDisabledNotificationIds((current) =>
+      enabled ? current.filter((id) => id !== event.id) : [...new Set([...current, event.id])],
+    );
+
+    if (enabled) {
+      notifiedRef.current.delete(event.id);
+      toast.success("Włączono powiadomienie");
+    } else {
+      notifiedRef.current.delete(event.id);
+      toast.info("Wyłączono powiadomienie");
+    }
   };
 
   return (
@@ -348,8 +387,19 @@ export function CalendarTab() {
           )}
           {events.map((e) => (
             <View key={e.id} className="flex-row items-start gap-3 rounded-xl border border-border bg-card p-3">
+              <Pressable
+                onPress={() => handleNotificationToggle(e)}
+                className="relative h-10 w-10 items-center justify-center"
+              >
+                <Bell color={disabledNotificationSet.has(e.id) ? "#a89fb5" : "#a173e8"} size={18} />
+                {disabledNotificationSet.has(e.id) && (
+                  <View
+                    className="absolute h-0.5 w-7 rounded-full bg-destructive"
+                    style={{ transform: [{ rotate: "-38deg" }] }}
+                  />
+                )}
+              </Pressable>
               <Pressable onPress={() => handleReminderPress(e)} className="flex-1 flex-row items-start gap-3">
-                <Bell color="#a173e8" size={16} style={{ marginTop: 2 }} />
                 <View className="flex-1">
                   <Text className="text-sm font-semibold text-foreground">
                     {formatDate(e.event_date)} • {e.event_time.slice(0, 5)}
