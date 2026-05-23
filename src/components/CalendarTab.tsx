@@ -440,7 +440,9 @@ export function CalendarTab() {
                               <Text className="text-[11px] font-semibold text-foreground">
                                 Godzina: {event.event_time.slice(0, 5)}
                               </Text>
-                              <Text className="text-[11px] text-muted-foreground">{event.content}</Text>
+                              <Text numberOfLines={1} ellipsizeMode="tail" className="text-[11px] text-muted-foreground">
+                                {event.content}
+                              </Text>
                             </View>
                           ))}
                         </View>
