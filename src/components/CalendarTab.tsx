@@ -70,6 +70,7 @@ export function CalendarTab() {
   const [pendingSnoozeRequest, setPendingSnoozeRequest] = useState<PendingSnoozeRequest | null>(null);
   const [snoozeDate, setSnoozeDate] = useState(() => getDefaultSnoozeSelection().date);
   const [snoozeTime, setSnoozeTime] = useState(() => getDefaultSnoozeSelection().time);
+  const [currentTimestamp, setCurrentTimestamp] = useState(() => Date.now());
   const [disabledNotificationIds, setDisabledNotificationIds] = useState<string[]>([]);
   const [notificationsEnabled, setNotificationsEnabled] = useState(Platform.OS === "web");
   const notifiedRef = useRef<Set<string>>(new Set());
@@ -263,6 +264,14 @@ export function CalendarTab() {
     };
   }, []);
 
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setCurrentTimestamp(Date.now());
+    }, 30_000);
+
+    return () => clearInterval(intervalId);
+  }, []);
+
   const shiftMonth = useCallback((delta: number) => {
     if (previewTimeoutRef.current) {
       clearTimeout(previewTimeoutRef.current);
@@ -304,6 +313,16 @@ export function CalendarTab() {
     setAddDialogDate(date);
     setOpenAdd(true);
   }, []);
+
+  const upcomingEvents = useMemo(
+    () => events.filter((event) => getEventDateTime(event).getTime() >= currentTimestamp),
+    [currentTimestamp, events],
+  );
+
+  const pastEventIds = useMemo(
+    () => new Set(events.filter((event) => getEventDateTime(event).getTime() < currentTimestamp).map((event) => event.id)),
+    [currentTimestamp, events],
+  );
 
   const handleNotificationToggle = async (event: Event) => {
     Vibration.vibrate(10);
@@ -404,6 +423,8 @@ export function CalendarTab() {
             const k = dateKey(d);
             const dayEvents = eventsByDate.get(k) ?? [];
             const has = dayEvents.length > 0;
+            const hasPast = dayEvents.some((event) => pastEventIds.has(event.id));
+            const hasUpcoming = dayEvents.some((event) => !pastEventIds.has(event.id));
             const isToday = k === todayKey;
             const isPreviewOpen = previewDateKey === k;
             return (
@@ -480,7 +501,12 @@ export function CalendarTab() {
                   )}
                   >
                     <Text className="text-sm font-semibold text-foreground">{d}</Text>
-                    {has && <View className="mt-0.5 h-1.5 w-1.5 rounded-full bg-accent" />}
+                    {has && (
+                      <View className="mt-1 flex-row items-center gap-1">
+                        {hasUpcoming && <View className="h-1.5 w-1.5 rounded-full bg-accent" />}
+                        {hasPast && <View className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />}
+                      </View>
+                    )}
                   </View>
                 </Pressable>
               </View>
@@ -508,14 +534,14 @@ export function CalendarTab() {
           </Button>
         </View>
         <View className="gap-2">
-          {events.length === 0 && (
+          {upcomingEvents.length === 0 && (
             <View className="rounded-xl border border-border bg-card p-4">
               <Text className="text-sm text-muted-foreground">
-                Brak zaplanowanej nauki. Dodaj termin lub poproś o plan AI.
+                Brak nadchodzących przypomnień. Dodaj termin lub poproś o plan AI.
               </Text>
             </View>
           )}
-          {events.map((e) => (
+          {upcomingEvents.map((e) => (
             <View key={e.id} className="flex-row items-start gap-3 rounded-xl border border-border bg-card p-3">
               <Pressable
                 onPress={() => handleNotificationToggle(e)}
@@ -735,6 +761,10 @@ export function CalendarTab() {
 function formatDate(d: string) {
   const [y, m, day] = d.split("-").map(Number);
   return `${String(day).padStart(2, "0")}.${String(m).padStart(2, "0")}.${y}`;
+}
+
+function getEventDateTime(event: Pick<Event, "event_date" | "event_time">) {
+  return new Date(`${event.event_date}T${event.event_time}`);
 }
 
 function todayISO() {
