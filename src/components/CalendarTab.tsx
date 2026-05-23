@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Platform, View, Text, Pressable, ScrollView, Vibration, PanResponder } from "react-native";
-import { ChevronLeft, ChevronRight, Plus, Sparkles, Trash2, Bell } from "lucide-react-native";
+import { ChevronLeft, ChevronRight, Sparkles, Trash2, Bell } from "lucide-react-native";
 import Constants from "expo-constants";
 import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { useAuth } from "@/lib/auth";
@@ -488,12 +488,8 @@ export function CalendarTab() {
           })}
         </View>
 
-        <View className="mb-4 flex-row gap-2">
-          <Button className="flex-1" onPress={() => openAddDialog(todayISO())}>
-            <Plus color="#fafafa" size={16} />
-            <Text className="text-sm font-semibold text-primary-foreground">Dodaj</Text>
-          </Button>
-          <Button variant="secondary" className="flex-1" onPress={() => setOpenAi(true)}>
+        <View className="mb-4">
+          <Button variant="secondary" onPress={() => setOpenAi(true)}>
             <Sparkles color="#f0ecf2" size={16} />
             <Text className="text-sm font-semibold text-secondary-foreground">Pomocnik AI</Text>
           </Button>
