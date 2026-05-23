@@ -323,11 +323,17 @@ export async function setPendingSnoozeRequestFromNotification(response: Notifica
 }
 
 export async function scheduleSnoozedNotification(request: PendingSnoozeRequest, minutes: number) {
-  if (!notificationsSupported()) return null;
-
   const normalizedMinutes = Math.max(1, Math.round(minutes));
   const date = getSnoozeDate(normalizedMinutes);
   if (!date) return null;
+
+  return scheduleSnoozedNotificationAt(request, date);
+}
+
+export async function scheduleSnoozedNotificationAt(request: PendingSnoozeRequest, date: Date) {
+  if (!notificationsSupported()) return null;
+
+  if (Number.isNaN(date.getTime())) return null;
 
   await ensureAndroidChannel();
 

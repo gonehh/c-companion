@@ -16,7 +16,7 @@ import {
   getPendingSnoozeRequest,
   getDisabledStudyEventIds,
   type PendingSnoozeRequest,
-  scheduleSnoozedNotification,
+  scheduleSnoozedNotificationAt,
   subscribeToPendingSnoozeRequest,
   syncStudyEventNotifications,
   toggleStudyEventNotificationEnabled,
@@ -67,7 +67,8 @@ export function CalendarTab() {
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [pendingDeleteEvent, setPendingDeleteEvent] = useState<Event | null>(null);
   const [pendingSnoozeRequest, setPendingSnoozeRequest] = useState<PendingSnoozeRequest | null>(null);
-  const [snoozeMinutes, setSnoozeMinutes] = useState("10");
+  const [snoozeDate, setSnoozeDate] = useState(() => getDefaultSnoozeSelection().date);
+  const [snoozeTime, setSnoozeTime] = useState(() => getDefaultSnoozeSelection().time);
   const [disabledNotificationIds, setDisabledNotificationIds] = useState<string[]>([]);
   const [notificationsEnabled, setNotificationsEnabled] = useState(Platform.OS === "web");
   const notifiedRef = useRef<Set<string>>(new Set());
@@ -154,8 +155,10 @@ export function CalendarTab() {
     const openPrompt = (request: PendingSnoozeRequest | null) => {
       if (!request || !active) return;
 
+      const defaultSnoozeSelection = getDefaultSnoozeSelection();
       setPendingSnoozeRequest(request);
-      setSnoozeMinutes("10");
+      setSnoozeDate(defaultSnoozeSelection.date);
+      setSnoozeTime(defaultSnoozeSelection.time);
       setOpenSnoozePrompt(true);
       clearPendingSnoozeRequest().catch(() => {
         // Ignore cleanup failures; the prompt is already visible to the user.
@@ -317,14 +320,31 @@ export function CalendarTab() {
   const handleSnoozeSubmit = async () => {
     if (!pendingSnoozeRequest) return;
 
-    const minutes = Number.parseInt(snoozeMinutes.trim(), 10);
-    if (!Number.isFinite(minutes) || minutes <= 0) {
-      toast.error("Podaj liczbę minut większą od zera");
+    const selectedDate = parseISODate(snoozeDate);
+    const selectedTime = parseTimeValue(snoozeTime);
+
+    if (!selectedDate || !selectedTime) {
+      toast.error("Wybierz poprawną datę i godzinę");
+      return;
+    }
+
+    const nextDate = new Date(
+      selectedDate.getFullYear(),
+      selectedDate.getMonth(),
+      selectedDate.getDate(),
+      selectedTime.getHours(),
+      selectedTime.getMinutes(),
+      0,
+      0,
+    );
+
+    if (nextDate.getTime() <= Date.now()) {
+      toast.error("Wybierz termin późniejszy niż teraz");
       return;
     }
 
     setSnoozing(true);
-    const notificationId = await scheduleSnoozedNotification(pendingSnoozeRequest, minutes);
+    const notificationId = await scheduleSnoozedNotificationAt(pendingSnoozeRequest, nextDate);
     setSnoozing(false);
 
     if (!notificationId) {
@@ -334,7 +354,7 @@ export function CalendarTab() {
 
     setOpenSnoozePrompt(false);
     setPendingSnoozeRequest(null);
-    toast.success(`Przełożono powiadomienie o ${minutes} min`);
+    toast.success(`Przełożono powiadomienie na ${formatDate(snoozeDate)} o ${snoozeTime}`);
   };
 
   return (
@@ -565,24 +585,18 @@ export function CalendarTab() {
                   ? `Powiadomienie dotyczy: ${pendingSnoozeRequest.content}`
                   : "Czy chcesz przełożyć to powiadomienie?"}
               </Text>
-              <View>
-                <Label>Liczba minut</Label>
-                <Input
-                  value={snoozeMinutes}
-                  onChangeText={setSnoozeMinutes}
-                  placeholder="10"
-                  autoCapitalize="none"
-                  keyboardType="numeric"
-                />
-              </View>
+              <DatePickerField label="Data" value={snoozeDate} onChange={setSnoozeDate} />
+              <TimePickerField label="Godzina" value={snoozeTime} onChange={setSnoozeTime} />
               <View className="flex-row gap-2">
                 <Button
                   variant="secondary"
                   className="flex-1"
                   onPress={() => {
+                    const defaultSnoozeSelection = getDefaultSnoozeSelection();
                     setOpenSnoozePrompt(false);
                     setPendingSnoozeRequest(null);
-                    setSnoozeMinutes("10");
+                    setSnoozeDate(defaultSnoozeSelection.date);
+                    setSnoozeTime(defaultSnoozeSelection.time);
                   }}
                   disabled={snoozing}
                 >
@@ -739,6 +753,18 @@ function parseTimeValue(value: string) {
 
 function formatTimeValue(date: Date) {
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function formatISODateValue(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function getDefaultSnoozeSelection() {
+  const date = new Date(Date.now() + 10 * 60_000);
+  return {
+    date: formatISODateValue(date),
+    time: formatTimeValue(date),
+  };
 }
 
 function DatePickerField({
