@@ -38,7 +38,7 @@ const sizeContainer: Record<Size, string> = {
 };
 
 export const Button = forwardRef<View, ButtonProps>(function Button(
-  { variant = "default", size = "default", disabled, loading, className, textClassName, children, ...rest },
+  { variant = "default", size = "default", disabled, loading, className, textClassName, children, style, ...rest },
   ref,
 ) {
   const isDisabled = disabled || loading;
@@ -47,12 +47,20 @@ export const Button = forwardRef<View, ButtonProps>(function Button(
       ref={ref}
       disabled={isDisabled}
       className={cn(
-        "flex-row items-center justify-center",
+        "flex-row items-center justify-center overflow-hidden",
         variantContainer[variant],
         sizeContainer[size],
         isDisabled && "opacity-50",
         className,
       )}
+      style={(state) => {
+        const baseStyle = typeof style === 'function' ? style(state) : style;
+        return [
+          baseStyle,
+          state.pressed && { opacity: 0.8 },
+          (state as any).hovered && { opacity: 0.9 },
+        ];
+      }}
       {...rest}
     >
       {loading ? (

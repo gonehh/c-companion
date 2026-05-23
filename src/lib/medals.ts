@@ -2,6 +2,8 @@ export type MedalTier = "bronze" | "silver" | "gold" | "diamond" | "obsidian";
 
 export const TIER_ORDER: MedalTier[] = ["bronze", "silver", "gold", "diamond", "obsidian"];
 
+export const ACHIEVEMENT_THRESHOLDS = [10, 30, 50, 80, 100] as const;
+
 export const TIER_LABEL: Record<MedalTier, string> = {
   bronze: "Brąz",
   silver: "Srebro",
