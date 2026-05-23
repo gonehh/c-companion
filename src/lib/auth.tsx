@@ -7,6 +7,11 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Session, User } from "@supabase/supabase-js";
 import { ACHIEVEMENT_THRESHOLDS, TIER_COLOR_STOPS, TIER_LABEL, TIER_ORDER, type MedalTier } from "@/lib/medals";
 import { THEMES } from "@/lib/theme";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "@/components/ui/toast";
 
 function FadeInScale({ children, delay = 0 }: { children: ReactNode; delay?: number }) {
   const scale = useRef(new Animated.Value(0.85)).current;
@@ -41,6 +46,7 @@ function FadeInScale({ children, delay = 0 }: { children: ReactNode; delay?: num
 interface Profile {
   id: string;
   nick: string;
+  email: string | null;
   skill_level: string | null;
 }
 
@@ -62,8 +68,8 @@ interface AuthCtx {
   loading: boolean;
   sessionStartTime: number;
   dailyStreak: number;
-  signUp: (nick: string, password: string) => Promise<{ error?: string }>;
-  signIn: (nick: string, password: string) => Promise<{ error?: string }>;
+  signUp: (nick: string, email: string, password: string) => Promise<{ error?: string }>;
+  signIn: (login: string, password: string) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   refreshStats: () => Promise<void>;
@@ -75,7 +81,12 @@ interface AuthCtx {
 
 const Ctx = createContext<AuthCtx | null>(null);
 
+const LEGACY_EMAIL_DOMAIN = "cppquest.local";
 const nickToEmail = (nick: string) => `${nick.trim().toLowerCase()}@cppquest.local`;
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmail(email));
+const isLegacyEmail = (email?: string | null) =>
+  !!email && normalizeEmail(email).endsWith(`@${LEGACY_EMAIL_DOMAIN}`);
 
 export function calculateLevelProgress(totalXp: number) {
   let level = 1;
@@ -105,6 +116,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [sessionStartTime] = useState<number>(Date.now());
   const [dailyStreak, setDailyStreak] = useState(0);
+  const [legacyEmailInput, setLegacyEmailInput] = useState("");
+  const [updatingLegacyEmail, setUpdatingLegacyEmail] = useState(false);
   const prevLevelRef = useRef<number | null>(null);
 
   const checkStreak = async (uid: string) => {
@@ -147,12 +160,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStats((data as UserStats | null) ?? null);
   };
 
-  const loadProfile = async (uid: string) => {
+  const loadProfile = async (uid: string, authEmail?: string | null) => {
     const [{ data: p }, { data: s }] = await Promise.all([
       supabase.from("profiles").select("*").eq("id", uid).maybeSingle(),
       supabase.from("user_stats").select("*").eq("user_id", uid).maybeSingle(),
     ]);
-    setProfile((p as Profile | null) ?? null);
+    let nextProfile = (p as Profile | null) ?? null;
+    const normalizedAuthEmail = authEmail ? normalizeEmail(authEmail) : null;
+
+    if (
+      nextProfile &&
+      normalizedAuthEmail &&
+      !isLegacyEmail(normalizedAuthEmail) &&
+      nextProfile.email !== normalizedAuthEmail
+    ) {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ email: normalizedAuthEmail })
+        .eq("id", uid);
+      if (!error) nextProfile = { ...nextProfile, email: normalizedAuthEmail };
+    }
+
+    setProfile(nextProfile);
     if (!s) await ensureStats(uid);
     else setStats((s as UserStats | null) ?? null);
     await checkStreak(uid);
@@ -163,19 +192,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(s);
       setUser(s?.user ?? null);
       if (s?.user) {
-        setTimeout(() => loadProfile(s.user.id), 0);
+        setTimeout(() => loadProfile(s.user.id, s.user.email ?? null), 0);
       } else {
         setProfile(null);
         setStats(null);
         setActiveAchievement(null);
         setAchievementQueue([]);
         prevLevelRef.current = null;
+        setLegacyEmailInput("");
+        setUpdatingLegacyEmail(false);
       }
     });
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setUser(data.session?.user ?? null);
-      if (data.session?.user) loadProfile(data.session.user.id);
+      if (data.session?.user) loadProfile(data.session.user.id, data.session.user.email ?? null);
       setLoading(false);
     });
     return () => sub.subscription.unsubscribe();
@@ -227,33 +258,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAchievementQueue(rest);
   }, [achievementQueue, activeAchievement]);
 
-  const signUp: AuthCtx["signUp"] = async (nick, password) => {
+  const signUp: AuthCtx["signUp"] = async (nick, email, password) => {
     const cleanNick = nick.trim();
+    const cleanEmail = normalizeEmail(email);
     if (cleanNick.length < 3) return { error: "Nick musi mieć co najmniej 3 znaki." };
+    if (!isValidEmail(cleanEmail)) return { error: "Podaj poprawny adres e-mail." };
+    if (isLegacyEmail(cleanEmail)) return { error: "Ten adres e-mail jest niedozwolony." };
     if (password.length < 6) return { error: "Hasło musi mieć co najmniej 6 znaków." };
     const { data: exists } = await supabase.rpc("nick_exists", { _nick: cleanNick });
     if (exists) return { error: "Ten nick jest już zajęty." };
     const { data, error } = await supabase.auth.signUp({
-      email: nickToEmail(cleanNick),
+      email: cleanEmail,
       password,
+      options: {
+        data: {
+          nick: cleanNick,
+        },
+      },
     });
-    if (error) return { error: error.message };
+    if (error) {
+      if (error.message.toLowerCase().includes("already registered")) {
+        return { error: "Ten adres e-mail jest już zajęty." };
+      }
+      return { error: error.message };
+    }
     if (data.user) {
       const { error: pErr } = await supabase
         .from("profiles")
-        .insert({ id: data.user.id, nick: cleanNick });
+        .insert({ id: data.user.id, nick: cleanNick, email: cleanEmail });
       if (pErr) return { error: pErr.message };
       await ensureStats(data.user.id);
     }
     return {};
   };
 
-  const signIn: AuthCtx["signIn"] = async (nick, password) => {
+  const signIn: AuthCtx["signIn"] = async (login, password) => {
+    const identifier = login.trim();
+    if (!identifier) return { error: "Podaj adres e-mail." };
+
+    // Starsze konta mogly logowac sie tylko nickiem. Pozwalamy na jednorazowy fallback,
+    // aby po zalogowaniu wymusic uzupelnienie prawdziwego adresu e-mail.
+    const email = identifier.includes("@") ? normalizeEmail(identifier) : nickToEmail(identifier);
     const { error } = await supabase.auth.signInWithPassword({
-      email: nickToEmail(nick),
+      email,
       password,
     });
-    if (error) return { error: "Zły nick lub hasło." };
+    if (error) return { error: "Nieprawidłowy e-mail lub hasło." };
     return {};
   };
 
@@ -306,6 +356,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }));
   };
 
+  const needsEmailCompletion = !!user && isLegacyEmail(user.email) && !profile?.email;
+
+  const completeLegacyEmail = async () => {
+    if (!user || updatingLegacyEmail) return;
+
+    const nextEmail = normalizeEmail(legacyEmailInput);
+    if (!isValidEmail(nextEmail)) {
+      toast.error("Podaj poprawny adres e-mail.");
+      return;
+    }
+    if (isLegacyEmail(nextEmail)) {
+      toast.error("Podaj prawdziwy adres e-mail.");
+      return;
+    }
+
+    setUpdatingLegacyEmail(true);
+
+    const { data, error } = await supabase.auth.updateUser({ email: nextEmail });
+    if (error) {
+      setUpdatingLegacyEmail(false);
+      if (error.message.toLowerCase().includes("already")) {
+        toast.error("Ten adres e-mail jest już zajęty.");
+      } else {
+        toast.error(error.message);
+      }
+      return;
+    }
+
+    const { error: profileError } = await supabase
+      .from("profiles")
+      .update({ email: nextEmail })
+      .eq("id", user.id);
+
+    setUpdatingLegacyEmail(false);
+
+    if (profileError) {
+      toast.error(profileError.message);
+      return;
+    }
+
+    setUser((data.user ?? user) as User);
+    setProfile((prev) => (prev ? { ...prev, email: nextEmail } : prev));
+    setLegacyEmailInput("");
+    toast.success("Adres e-mail został zapisany.");
+  };
+
   return (
     <Ctx.Provider
       value={{
@@ -335,6 +431,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         level={stats?.level ?? 1}
         onClose={() => setActiveAchievement(null)}
       />
+      <Dialog open={needsEmailCompletion} onOpenChange={() => {}}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Uzupełnij adres e-mail</DialogTitle>
+          </DialogHeader>
+          <Text style={{ color: "#a89fb5", fontSize: 14, lineHeight: 20 }}>
+            To konto korzysta jeszcze ze starego logowania po nicku. Podaj adres e-mail, aby od teraz logować się emailem i hasłem.
+          </Text>
+          <View style={{ gap: 8 }}>
+            <Label>E-mail</Label>
+            <Input
+              value={legacyEmailInput}
+              onChangeText={setLegacyEmailInput}
+              placeholder="np. ola@example.com"
+              autoCapitalize="none"
+              keyboardType="email-address"
+              autoComplete="email"
+            />
+          </View>
+          <Button onPress={completeLegacyEmail} loading={updatingLegacyEmail} disabled={updatingLegacyEmail}>
+            Zapisz e-mail
+          </Button>
+          <Button variant="secondary" onPress={signOut} disabled={updatingLegacyEmail}>
+            Wyloguj
+          </Button>
+        </DialogContent>
+      </Dialog>
     </Ctx.Provider>
   );
 }

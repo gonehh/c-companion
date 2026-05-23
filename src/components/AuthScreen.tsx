@@ -11,7 +11,9 @@ import { cn } from "@/lib/utils";
 export function AuthScreen() {
   const { signIn, signUp } = useAuth();
   const [mode, setMode] = useState<"login" | "signup">("login");
+  const [login, setLogin] = useState("");
   const [nick, setNick] = useState("");
+  const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [pw2, setPw2] = useState("");
   const [busy, setBusy] = useState(false);
@@ -25,11 +27,11 @@ export function AuthScreen() {
           toast.error("Hasła nie są takie same.");
           return;
         }
-        const { error } = await signUp(nick, pw);
+        const { error } = await signUp(nick, email, pw);
         if (error) toast.error(error);
         else toast.success("Konto utworzone!");
       } else {
-        const { error } = await signIn(nick, pw);
+        const { error } = await signIn(login, pw);
         if (error) toast.error(error);
       }
     } finally {
@@ -51,7 +53,7 @@ export function AuthScreen() {
             <View className="mb-3 h-16 w-16 items-center justify-center rounded-2xl border border-primary/40 bg-primary/20">
               <Code2 color="#a173e8" size={32} />
             </View>
-            <Text className="text-2xl font-bold text-foreground">C++ Quest</Text>
+            <Text className="text-2xl font-bold text-foreground">Code Loom</Text>
             <Text className="mt-1 text-sm text-muted-foreground">Nauka C++ krok po kroku</Text>
           </View>
 
@@ -92,10 +94,40 @@ export function AuthScreen() {
             </View>
 
             <View className="gap-4">
-              <View>
-                <Label>Nick</Label>
-                <Input value={nick} onChangeText={setNick} maxLength={24} placeholder="np. olaCpp" autoCapitalize="none" />
-              </View>
+              {mode === "signup" ? (
+                <>
+                  <View>
+                    <Label>Nick</Label>
+                    <Input value={nick} onChangeText={setNick} maxLength={24} placeholder="np. olaCpp" autoCapitalize="none" />
+                  </View>
+                  <View>
+                    <Label>E-mail</Label>
+                    <Input
+                      value={email}
+                      onChangeText={setEmail}
+                      placeholder="np. ola@example.com"
+                      autoCapitalize="none"
+                      keyboardType="email-address"
+                      autoComplete="email"
+                    />
+                  </View>
+                </>
+              ) : (
+                <View>
+                  <Label>E-mail</Label>
+                  <Input
+                    value={login}
+                    onChangeText={setLogin}
+                    placeholder="np. ola@example.com"
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                    autoComplete="email"
+                  />
+                  <Text className="mt-2 text-xs text-muted-foreground">
+                    Jeśli masz starsze konto, możesz zalogować się jeszcze dotychczasowym nickiem i od razu uzupełnić e-mail.
+                  </Text>
+                </View>
+              )}
               <View>
                 <Label>Hasło</Label>
                 <Input value={pw} onChangeText={setPw} secureTextEntry />

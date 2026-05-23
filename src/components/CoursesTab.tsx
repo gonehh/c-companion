@@ -9,7 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { toast } from "@/components/ui/toast";
 import { useResponsive, useScreenLayout } from "@/lib/responsive";
 import { cn } from "@/lib/utils";
-import { ROADMAP, totalLessons, type RoadmapQuestion, type RoadmapStage, type RoadmapLesson } from "@/lib/roadmap";
+import { getStagesForTrack, totalLessons, type RoadmapQuestion, type RoadmapStage, type RoadmapLesson } from "@/lib/roadmap";
 import { useTheme } from "@/lib/theme";
 import { TRACKS, type Track } from "@/lib/cppCourse";
 
@@ -89,10 +89,11 @@ export function CoursesTab() {
 
   if (!track) return <SkillSurvey />;
 
-  const stages = ROADMAP;
-  const lessonsTotal = totalLessons();
-  const lessonsCompleted = lessonDone.size;
-  const percent = lessonsTotal ? (lessonsCompleted / lessonsTotal) * 100 : 0;
+  const stages = getStagesForTrack(track);
+  const visibleLessonsTotal = totalLessons(stages);
+  const visibleLessonIds = new Set(stages.flatMap((stage) => stage.lessons.map((lesson) => lesson.id)));
+  const visibleLessonsCompleted = [...lessonDone].filter((lessonId) => visibleLessonIds.has(lessonId)).length;
+  const percent = visibleLessonsTotal ? (visibleLessonsCompleted / visibleLessonsTotal) * 100 : 0;
   const trackLabel = TRACKS.find((t) => t.id === track)?.label ?? track;
 
   const findStage = (id: string) => stages.find((s) => s.id === id) ?? null;
@@ -210,17 +211,23 @@ export function CoursesTab() {
     <ScrollView
       className="flex-1"
       style={{ backgroundColor: theme.colors.background }}
+      bounces={false}
+      alwaysBounceVertical={false}
+      overScrollMode="never"
       contentContainerStyle={{ padding, paddingBottom: padding * 2 }}
     >
       <View className="mx-auto w-full" style={maxWidth ? { maxWidth } : undefined}>
         <Text className="text-xs uppercase tracking-wider" style={{ color: theme.colors.mutedForeground }}>
-          MAPA DROGOWA C++
+          MAPA ROZWOJU
         </Text>
         <Text className="mt-1 text-3xl font-bold" style={{ color: theme.colors.foreground }}>
           Twoja ścieżka
         </Text>
         <Text className="mt-2 text-sm" style={{ color: theme.colors.mutedForeground }}>
-          Ukończono {lessonsCompleted} / {lessonsTotal} lekcji • dopasowane do: {trackLabel}
+          Ukończono {visibleLessonsCompleted} / {visibleLessonsTotal} lekcji • dopasowane do: {trackLabel}
+        </Text>
+        <Text className="mt-1 text-xs" style={{ color: theme.colors.mutedForeground }}>
+          Ta ścieżka ma 5 etapów, a kazdy etap zawiera 5 poziomow dopasowanych do wybranego poziomu.
         </Text>
 
         <View className="mt-4">
@@ -263,7 +270,7 @@ export function CoursesTab() {
                     const done = lessonDone.has(l.id);
                     const prevId = i > 0 ? stage.lessons[i - 1]!.id : null;
                     const unlocked = i === 0 || (prevId ? lessonDone.has(prevId) : true);
-                    const code = l.title.split("·")[0]?.trim() || `L${i + 1}`;
+                    const code = `${idx + 1}.${i + 1}`;
                     return (
                       <Pressable
                         key={l.id}

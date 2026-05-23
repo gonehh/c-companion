@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Easing, View, Text, Pressable, ScrollView, TextInput } from "react-native";
+import { Animated, Easing, View, Text, Pressable, ScrollView } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 
 function FadeInScale({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
@@ -32,7 +32,7 @@ function FadeInScale({ children, delay = 0 }: { children: React.ReactNode; delay
   );
 }
 import { LogOut, Trophy, Plus, Flame, Clock } from "lucide-react-native";
-import { useAuth, calculateLevelProgress, type ThemeId } from "@/lib/auth";
+import { useAuth, calculateLevelProgress } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { ACHIEVEMENT_THRESHOLDS, TIER_COLOR_STOPS, TIER_LABEL, TIER_ORDER, type MedalTier } from "@/lib/medals";
 import { Button } from "@/components/ui/button";
@@ -43,7 +43,7 @@ import { useResponsive, useScreenLayout } from "@/lib/responsive";
 import { useTheme } from "@/lib/theme";
 
 export function ProfileTab() {
-  const { profile, signOut, user, stats, setTheme, refreshStats, notifyProgressChanged, addXp, sessionStartTime, dailyStreak } = useAuth();
+  const { profile, signOut, user, stats, sessionStartTime, dailyStreak } = useAuth();
   const { theme } = useTheme();
   const { breakpoint } = useResponsive();
   const { padding, maxWidth } = useScreenLayout();
@@ -51,10 +51,7 @@ export function ProfileTab() {
   const [goal, setGoal] = useState<string>("");
   const [goalDialogOpen, setGoalDialogOpen] = useState(false);
   const [savingGoal, setSavingGoal] = useState(false);
-  const [resettingProgress, setResettingProgress] = useState(false);
   const [openAchievement, setOpenAchievement] = useState<MedalTier | null>(null);
-  const [debugXpInput, setDebugXpInput] = useState("");
-  const [updatingDebugXp, setUpdatingDebugXp] = useState(false);
 
   const loadProfileSnapshot = async () => {
     if (!user) return;
@@ -95,12 +92,6 @@ export function ProfileTab() {
     }));
   }, [stats?.level]);
 
-  const themeOptions: { id: ThemeId; label: string }[] = [
-    { id: "midnight", label: "Północ" },
-    { id: "black", label: "Czerń" },
-    { id: "charcoal", label: "Grafit" },
-  ];
-
   const saveGoal = async () => {
     if (!user) return;
     const text = goal.trim();
@@ -110,49 +101,6 @@ export function ProfileTab() {
     setSavingGoal(false);
     if (error) return;
     setGoalDialogOpen(false);
-  };
-
-  const resetProgress = async () => {
-    if (!user || resettingProgress) return;
-    setResettingProgress(true);
-    const themeId = (stats?.theme ?? "midnight") as ThemeId;
-    const [lessonsRes, quizRes, examRes, statsRes] = await Promise.all([
-      supabase.from("lesson_progress").delete().eq("user_id", user.id),
-      supabase.from("stage_quiz_attempts").delete().eq("user_id", user.id),
-      supabase.from("exam_attempts").delete().eq("user_id", user.id),
-      supabase.from("user_stats").upsert({ user_id: user.id, xp: 0, level: 1, theme: themeId }, { onConflict: "user_id" }),
-    ]);
-    setResettingProgress(false);
-
-    const error = lessonsRes.error || quizRes.error || examRes.error || statsRes.error;
-    if (error) {
-      const msg = typeof error.message === "string" && error.message.trim().length
-        ? error.message
-        : "Nie udało się zresetować progresu";
-      const code = typeof error.code === "string" && error.code.trim().length ? ` (${error.code})` : "";
-      toast.error(`${msg}${code}`);
-      return;
-    }
-
-    setQuizStats({ avg: 0, quizzes: 0 });
-    await refreshStats();
-    await loadProfileSnapshot();
-    notifyProgressChanged();
-    toast.success("Zresetowano progres, level i XP");
-  };
-
-  const applyDebugXpChange = async (direction: 1 | -1) => {
-    const amount = Number.parseInt(debugXpInput.trim(), 10);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      toast.error("Wpisz poprawną liczbę XP");
-      return;
-    }
-
-    setUpdatingDebugXp(true);
-    await addXp(direction * amount);
-    setUpdatingDebugXp(false);
-    setDebugXpInput("");
-    toast.success(direction > 0 ? `Dodano ${amount} XP` : `Odjęto ${amount} XP`);
   };
 
   const activeAchievement = openAchievement
@@ -179,6 +127,9 @@ export function ProfileTab() {
       <ScrollView
         className="flex-1"
         style={{ backgroundColor: "transparent" }}
+        bounces={false}
+        alwaysBounceVertical={false}
+        overScrollMode="never"
         contentContainerStyle={{ padding, paddingBottom: padding * 2 }}
       >
         <LinearGradient
@@ -335,94 +286,6 @@ export function ProfileTab() {
               ? goal.trim()
               : "Ustaw cel — np. „ukończyć OOP w tym miesiącu” — żeby lepiej planować naukę."}
           </Text>
-        </View>
-
-        <View
-          className="mt-6 rounded-2xl border p-4"
-          style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.card }}
-        >
-          <Text className="font-bold" style={{ color: theme.colors.foreground }}>
-            Motyw
-          </Text>
-          <View className="mt-3 flex-row gap-2">
-            {themeOptions.map((t) => {
-              const active = (stats?.theme ?? "midnight") === t.id;
-              return (
-                <Pressable
-                  key={t.id}
-                  onPress={() => setTheme(t.id)}
-                  className="flex-1 items-center justify-center rounded-full border py-2 overflow-hidden"
-                  style={(state) => [
-                    {
-                      borderColor: active ? theme.colors.primary : theme.colors.border,
-                      backgroundColor: active ? "transparent" : theme.colors.muted,
-                    },
-                    state.pressed && { opacity: 0.8 },
-                    (state as any).hovered && { opacity: 0.9 },
-                  ]}
-                >
-                  {active && (
-                    <LinearGradient
-                      colors={[`${theme.colors.primary}4D`, `${theme.colors.primary}11`]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={{ position: "absolute", inset: 0 }}
-                    />
-                  )}
-                  <Text style={{ color: theme.colors.foreground }}>{t.label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-
-        <View
-          className="mt-6 rounded-2xl border p-4"
-          style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.card }}
-        >
-          <Text className="font-bold" style={{ color: theme.colors.foreground }}>
-            Debug
-          </Text>
-          <Text className="mt-2 text-sm" style={{ color: theme.colors.mutedForeground }}>
-            Resetuje cały progres kursu, quizy, egzaminy, XP i poziom. Motyw zostaje bez zmian.
-          </Text>
-          <Text className="mt-3 text-sm" style={{ color: theme.colors.mutedForeground }}>
-            Zmiana XP przelicza poziom automatycznie według aktualnego progu: {levelXp} XP na poziom.
-          </Text>
-          <TextInput
-            value={debugXpInput}
-            onChangeText={(text) => setDebugXpInput(text.replace(/[^0-9]/g, ""))}
-            keyboardType="number-pad"
-            placeholder="Np. 5"
-            placeholderTextColor={theme.colors.mutedForeground}
-            style={{
-              marginTop: 12,
-              borderRadius: 14,
-              borderWidth: 1,
-              borderColor: theme.colors.border,
-              backgroundColor: theme.colors.muted,
-              color: theme.colors.foreground,
-              paddingHorizontal: 14,
-              paddingVertical: 12,
-            }}
-          />
-          <View className="mt-3 flex-row gap-2">
-            <Button className="flex-1" onPress={() => applyDebugXpChange(1)} loading={updatingDebugXp} disabled={updatingDebugXp}>
-              Dodaj XP
-            </Button>
-            <Button
-              className="flex-1"
-              variant="secondary"
-              onPress={() => applyDebugXpChange(-1)}
-              loading={updatingDebugXp}
-              disabled={updatingDebugXp}
-            >
-              Odejmij XP
-            </Button>
-          </View>
-          <Button className="mt-4" variant="destructive" onPress={resetProgress} loading={resettingProgress} disabled={resettingProgress}>
-            Resetuj progres
-          </Button>
         </View>
 
         <Dialog open={goalDialogOpen} onOpenChange={setGoalDialogOpen}>
