@@ -360,6 +360,9 @@ export function CalendarTab() {
   return (
     <ScrollView
       className="flex-1 bg-background"
+      bounces={false}
+      alwaysBounceVertical={false}
+      overScrollMode="never"
       contentContainerStyle={{ padding, paddingBottom: padding * 2 }}
     >
       <View className="mx-auto w-full" style={maxWidth ? { maxWidth } : undefined}>
