@@ -809,7 +809,7 @@ function DatePickerField({
         <Text className="text-sm text-foreground">{formatDate(value)}</Text>
       </Pressable>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={setOpen} scrollEnabled={false}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Wybierz datę</DialogTitle>

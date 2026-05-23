@@ -7,9 +7,10 @@ interface DialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   children: ReactNode;
+  scrollEnabled?: boolean;
 }
 
-export function Dialog({ open, onOpenChange, children }: DialogProps) {
+export function Dialog({ open, onOpenChange, children, scrollEnabled = true }: DialogProps) {
   return (
     <Modal
       visible={open}
@@ -33,7 +34,15 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
           >
             <X size={18} color="#a89fb5" />
           </Pressable>
-          <ScrollView showsVerticalScrollIndicator={false}>{children}</ScrollView>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            scrollEnabled={scrollEnabled}
+            bounces={false}
+            alwaysBounceVertical={false}
+            overScrollMode="never"
+          >
+            {children}
+          </ScrollView>
         </Pressable>
       </Pressable>
     </Modal>
