@@ -1,5 +1,6 @@
 import "../global.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import * as NavigationBar from "expo-navigation-bar";
 import * as Notifications from "expo-notifications";
 import { Stack, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -25,6 +26,23 @@ export default function RootLayout() {
   const router = useRouter();
   const [client] = useState(() => new QueryClient());
   const lastHandledNotificationIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+
+    const enableImmersiveMode = async () => {
+      try {
+        await NavigationBar.setPositionAsync("absolute");
+        await NavigationBar.setBehaviorAsync("overlay-swipe");
+        await NavigationBar.setBackgroundColorAsync("#00000000");
+        await NavigationBar.setVisibilityAsync("hidden");
+      } catch (error) {
+        console.error("Nie udalo sie ukryc paska nawigacji Androida", error);
+      }
+    };
+
+    enableImmersiveMode();
+  }, []);
 
   useEffect(() => {
     const handleNotificationResponse = async (response: Notifications.NotificationResponse | null) => {

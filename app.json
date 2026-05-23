@@ -6,6 +6,12 @@
     "orientation": "portrait",
     "scheme": "cppquest",
     "userInterfaceStyle": "dark",
+    "androidStatusBar": {
+      "hidden": true,
+      "barStyle": "light-content",
+      "backgroundColor": "#00000000",
+      "translucent": true
+    },
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
@@ -21,7 +27,15 @@
     },
     "plugins": [
       "expo-router",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-navigation-bar",
+        {
+          "hidden": true,
+          "style": "light",
+          "enforceContrast": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false
