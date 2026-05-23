@@ -18,7 +18,7 @@ export type ThemePalette = {
   };
 };
 
-const THEMES: Record<ThemeId, ThemePalette> = {
+export const THEMES: Record<ThemeId, ThemePalette> = {
   midnight: {
     id: "midnight",
     label: "Midnight",
@@ -75,4 +75,3 @@ export function useTheme() {
   const theme = useMemo(() => THEMES[themeId], [themeId]);
   return { theme, themeId, setTheme };
 }
-
