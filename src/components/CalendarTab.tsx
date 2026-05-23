@@ -291,7 +291,6 @@ export function CalendarTab() {
   );
 
   const handleReminderPress = (event: Event) => {
-    Vibration.vibrate(6);
     setEditingEvent(event);
     setOpenEdit(true);
   };
