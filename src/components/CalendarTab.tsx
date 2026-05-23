@@ -58,6 +58,7 @@ export function CalendarTab() {
   const [openAi, setOpenAi] = useState(false);
   const [openClearAll, setOpenClearAll] = useState(false);
   const [openDeleteOne, setOpenDeleteOne] = useState(false);
+  const [addDialogDate, setAddDialogDate] = useState(todayISO());
   const [openSnoozePrompt, setOpenSnoozePrompt] = useState(false);
   const [clearingAll, setClearingAll] = useState(false);
   const [deletingOne, setDeletingOne] = useState(false);
@@ -73,6 +74,7 @@ export function CalendarTab() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(Platform.OS === "web");
   const notifiedRef = useRef<Set<string>>(new Set());
   const previewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewHoldTriggeredRef = useRef(false);
 
   const load = async () => {
     if (!user) return;
@@ -298,6 +300,11 @@ export function CalendarTab() {
     setOpenEdit(true);
   };
 
+  const openAddDialog = useCallback((date: string) => {
+    setAddDialogDate(date);
+    setOpenAdd(true);
+  }, []);
+
   const handleNotificationToggle = async (event: Event) => {
     Vibration.vibrate(10);
 
@@ -406,8 +413,10 @@ export function CalendarTab() {
               >
                 <Pressable
                   onPressIn={() => {
+                    previewHoldTriggeredRef.current = false;
                     if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
                     previewTimeoutRef.current = setTimeout(() => {
+                      previewHoldTriggeredRef.current = true;
                       setPreviewDateKey(k);
                     }, 250);
                   }}
@@ -417,6 +426,14 @@ export function CalendarTab() {
                       previewTimeoutRef.current = null;
                     }
                     setPreviewDateKey((current) => (current === k ? null : current));
+                  }}
+                  onPress={() => {
+                    if (previewHoldTriggeredRef.current) {
+                      previewHoldTriggeredRef.current = false;
+                      return;
+                    }
+
+                    openAddDialog(k);
                   }}
                   className="flex-1"
                 >
@@ -472,7 +489,7 @@ export function CalendarTab() {
         </View>
 
         <View className="mb-4 flex-row gap-2">
-          <Button className="flex-1" onPress={() => setOpenAdd(true)}>
+          <Button className="flex-1" onPress={() => openAddDialog(todayISO())}>
             <Plus color="#fafafa" size={16} />
             <Text className="text-sm font-semibold text-primary-foreground">Dodaj</Text>
           </Button>
@@ -552,6 +569,8 @@ export function CalendarTab() {
 
         <Dialog open={openAdd} onOpenChange={setOpenAdd}>
           <AddEventDialogBody
+            open={openAdd}
+            initialDate={addDialogDate}
             onAdded={() => {
               setOpenAdd(false);
               load();
@@ -1016,12 +1035,29 @@ function getLocalApiBaseUrl() {
   return "http://localhost:8787";
 }
 
-function AddEventDialogBody({ onAdded }: { onAdded: () => void }) {
+function AddEventDialogBody({
+  open,
+  initialDate,
+  onAdded,
+}: {
+  open: boolean;
+  initialDate: string;
+  onAdded: () => void;
+}) {
   const { user } = useAuth();
-  const [date, setDate] = useState(todayISO());
+  const [date, setDate] = useState(initialDate);
   const [time, setTime] = useState("18:00");
   const [content, setContent] = useState("");
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+
+    setDate(initialDate);
+    setTime("18:00");
+    setContent("");
+    setBusy(false);
+  }, [initialDate, open]);
 
   const save = async () => {
     if (!user || !content.trim()) return;
