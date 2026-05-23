@@ -63,6 +63,7 @@ export function CalendarTab() {
   const [deletingOne, setDeletingOne] = useState(false);
   const [snoozing, setSnoozing] = useState(false);
   const [previewDateKey, setPreviewDateKey] = useState<string | null>(null);
+  const [expandedReminderId, setExpandedReminderId] = useState<string | null>(null);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [pendingDeleteEvent, setPendingDeleteEvent] = useState<Event | null>(null);
   const [pendingSnoozeRequest, setPendingSnoozeRequest] = useState<PendingSnoozeRequest | null>(null);
@@ -246,6 +247,10 @@ export function CalendarTab() {
   useEffect(() => {
     setPreviewDateKey(null);
   }, [cursor]);
+
+  useEffect(() => {
+    setExpandedReminderId((current) => (current && !events.some((event) => event.id === current) ? null : current));
+  }, [events]);
 
   useEffect(() => {
     return () => {
@@ -488,6 +493,9 @@ export function CalendarTab() {
                 )}
               </Pressable>
               <Pressable
+                onPress={() => {
+                  setExpandedReminderId((current) => (current === e.id ? null : e.id));
+                }}
                 onLongPress={() => handleReminderPress(e)}
                 delayLongPress={180}
                 className="flex-1 flex-row items-start gap-3"
@@ -496,7 +504,27 @@ export function CalendarTab() {
                   <Text className="text-sm font-semibold text-foreground">
                     {formatDate(e.event_date)} • {e.event_time.slice(0, 5)}
                   </Text>
-                  <Text className="text-sm text-muted-foreground">{e.content}</Text>
+                  <Text
+                    numberOfLines={expandedReminderId === e.id ? undefined : 1}
+                    ellipsizeMode="tail"
+                    className="text-sm text-muted-foreground"
+                  >
+                    {e.content}
+                  </Text>
+                  {expandedReminderId === e.id && (
+                    <View className="mt-2 gap-1 rounded-lg bg-secondary px-3 py-2">
+                      <Text className="text-xs font-semibold text-foreground">
+                        Data: {formatDate(e.event_date)}
+                      </Text>
+                      <Text className="text-xs font-semibold text-foreground">
+                        Godzina: {e.event_time.slice(0, 5)}
+                      </Text>
+                      <Text className="text-xs text-muted-foreground">{e.content}</Text>
+                      <Text className="text-[11px] text-muted-foreground">
+                        Powiadomienie: {disabledNotificationSet.has(e.id) ? "wyłączone" : "włączone"}
+                      </Text>
+                    </View>
+                  )}
                 </View>
               </Pressable>
               <Pressable
