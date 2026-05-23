@@ -790,6 +790,26 @@ function DatePickerField({
     if (!open) setCursor(parseISODate(value) ?? new Date());
   }, [open, value]);
 
+  const shiftMonth = useCallback((delta: number) => {
+    setCursor((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
+  }, []);
+
+  const datePickerPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gestureState) =>
+          Math.abs(gestureState.dx) > 14 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy),
+        onPanResponderRelease: (_, gestureState) => {
+          if (Math.abs(gestureState.dx) < 50 || Math.abs(gestureState.dx) < Math.abs(gestureState.dy)) {
+            return;
+          }
+
+          shiftMonth(gestureState.dx < 0 ? 1 : -1);
+        },
+      }),
+    [shiftMonth],
+  );
+
   const selectDate = (day: number) => {
     const nextValue = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     onChange(nextValue);
@@ -818,7 +838,7 @@ function DatePickerField({
           <View className="gap-3">
             <View className="flex-row items-center justify-between">
               <Pressable
-                onPress={() => setCursor(new Date(year, month - 1, 1))}
+                onPress={() => shiftMonth(-1)}
                 className="rounded-lg p-2 active:bg-secondary"
               >
                 <ChevronLeft color="#f0ecf2" size={20} />
@@ -829,7 +849,7 @@ function DatePickerField({
               </Text>
 
               <Pressable
-                onPress={() => setCursor(new Date(year, month + 1, 1))}
+                onPress={() => shiftMonth(1)}
                 className="rounded-lg p-2 active:bg-secondary"
               >
                 <ChevronRight color="#f0ecf2" size={20} />
@@ -844,7 +864,7 @@ function DatePickerField({
               ))}
             </View>
 
-            <View className="flex-row flex-wrap">
+            <View className="flex-row flex-wrap" {...datePickerPanResponder.panHandlers}>
               {grid.map((day, index) => {
                 if (!day) return <View key={index} style={{ width: `${100 / 7}%`, aspectRatio: 1, padding: 2 }} />;
 
