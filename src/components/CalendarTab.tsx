@@ -830,16 +830,7 @@ function TimePickerField({
   }, [open, value]);
 
   const handleChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
-    if (Platform.OS === "android") {
-      if (event.type === "dismissed") {
-        setOpen(false);
-        return;
-      }
-
-      if (selectedDate) {
-        onChange(formatTimeValue(selectedDate));
-        setTempTime(selectedDate);
-      }
+    if (event.type === "dismissed") {
       setOpen(false);
       return;
     }
@@ -866,45 +857,38 @@ function TimePickerField({
         <Text className="text-sm text-foreground">{value}</Text>
       </Pressable>
 
-      {Platform.OS === "ios" ? (
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Wybierz godzinę</DialogTitle>
-            </DialogHeader>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Wybierz godzinę</DialogTitle>
+          </DialogHeader>
 
-            <View className="gap-3">
-              <DateTimePicker
-                value={tempTime}
-                mode="time"
-                display="spinner"
-                onChange={handleChange}
-                textColor="#f0ecf2"
-                themeVariant="dark"
-              />
+          <View className="gap-3">
+            <DateTimePicker
+              value={tempTime}
+              mode="time"
+              display="spinner"
+              onChange={handleChange}
+              {...(Platform.OS === "ios" ? { textColor: "#f0ecf2", themeVariant: "dark" as const } : {})}
+            />
 
-              <View className="flex-row gap-2">
-                <Button variant="secondary" className="flex-1" onPress={() => setOpen(false)}>
-                  Anuluj
-                </Button>
-                <Button
-                  className="flex-1"
-                  onPress={() => {
-                    onChange(formatTimeValue(tempTime));
-                    setOpen(false);
-                  }}
-                >
-                  Wybierz
-                </Button>
-              </View>
+            <View className="flex-row gap-2">
+              <Button variant="secondary" className="flex-1" onPress={() => setOpen(false)}>
+                Anuluj
+              </Button>
+              <Button
+                className="flex-1"
+                onPress={() => {
+                  onChange(formatTimeValue(tempTime));
+                  setOpen(false);
+                }}
+              >
+                Wybierz
+              </Button>
             </View>
-          </DialogContent>
-        </Dialog>
-      ) : null}
-
-      {Platform.OS === "android" && open ? (
-        <DateTimePicker value={tempTime} mode="time" display="default" onChange={handleChange} />
-      ) : null}
+          </View>
+        </DialogContent>
+      </Dialog>
     </View>
   );
 }
