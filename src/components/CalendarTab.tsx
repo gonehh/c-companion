@@ -530,20 +530,6 @@ export function CalendarTab() {
                   >
                     {e.content}
                   </Text>
-                  {expandedReminderId === e.id && (
-                    <View className="mt-2 gap-1 rounded-lg bg-secondary px-3 py-2">
-                      <Text className="text-xs font-semibold text-foreground">
-                        Data: {formatDate(e.event_date)}
-                      </Text>
-                      <Text className="text-xs font-semibold text-foreground">
-                        Godzina: {e.event_time.slice(0, 5)}
-                      </Text>
-                      <Text className="text-xs text-muted-foreground">{e.content}</Text>
-                      <Text className="text-[11px] text-muted-foreground">
-                        Powiadomienie: {disabledNotificationSet.has(e.id) ? "wyłączone" : "włączone"}
-                      </Text>
-                    </View>
-                  )}
                 </View>
               </Pressable>
               <Pressable
