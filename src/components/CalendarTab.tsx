@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Platform, View, Text, Pressable, ScrollView, Vibration } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Platform, View, Text, Pressable, ScrollView, Vibration, PanResponder } from "react-native";
 import { ChevronLeft, ChevronRight, Plus, Sparkles, Trash2, Bell } from "lucide-react-native";
 import Constants from "expo-constants";
 import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
@@ -253,6 +253,38 @@ export function CalendarTab() {
     };
   }, []);
 
+  const shiftMonth = useCallback((delta: number) => {
+    if (previewTimeoutRef.current) {
+      clearTimeout(previewTimeoutRef.current);
+      previewTimeoutRef.current = null;
+    }
+    setPreviewDateKey(null);
+    setCursor((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
+  }, []);
+
+  const calendarPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gestureState) =>
+          Math.abs(gestureState.dx) > 14 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy),
+        onPanResponderRelease: (_, gestureState) => {
+          if (Math.abs(gestureState.dx) < 50 || Math.abs(gestureState.dx) < Math.abs(gestureState.dy)) {
+            return;
+          }
+
+          shiftMonth(gestureState.dx < 0 ? 1 : -1);
+        },
+        onPanResponderTerminate: () => {
+          if (previewTimeoutRef.current) {
+            clearTimeout(previewTimeoutRef.current);
+            previewTimeoutRef.current = null;
+          }
+          setPreviewDateKey(null);
+        },
+      }),
+    [shiftMonth],
+  );
+
   const handleReminderPress = (event: Event) => {
     Vibration.vibrate(6);
     setEditingEvent(event);
@@ -309,7 +341,7 @@ export function CalendarTab() {
       <View className="mx-auto w-full" style={maxWidth ? { maxWidth } : undefined}>
         <View className="mb-4 flex-row items-center justify-between">
           <Pressable
-            onPress={() => setCursor(new Date(year, month - 1, 1))}
+            onPress={() => shiftMonth(-1)}
             className="rounded-lg p-2 active:bg-secondary"
           >
             <ChevronLeft color="#f0ecf2" size={20} />
@@ -318,7 +350,7 @@ export function CalendarTab() {
             {PL_MONTHS[month]} {year}
           </Text>
           <Pressable
-            onPress={() => setCursor(new Date(year, month + 1, 1))}
+            onPress={() => shiftMonth(1)}
             className="rounded-lg p-2 active:bg-secondary"
           >
             <ChevronRight color="#f0ecf2" size={20} />
@@ -332,7 +364,7 @@ export function CalendarTab() {
             </View>
           ))}
         </View>
-        <View className="mb-5 flex-row flex-wrap">
+        <View className="mb-5 flex-row flex-wrap" {...calendarPanResponder.panHandlers}>
           {grid.map((d, i) => {
             if (!d) return <View key={i} style={{ width: `${100 / 7}%`, aspectRatio: 1, padding: 2 }} />;
             const k = dateKey(d);
