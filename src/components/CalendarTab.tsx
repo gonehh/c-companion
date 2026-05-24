@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Sparkles, Trash2, Bell } from "lucide-react-
 import Constants from "expo-constants";
 import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { useAuth } from "@/lib/auth";
+import { useTheme } from "@/lib/theme";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,6 +51,7 @@ const PL_MONTHS = [
 
 export function CalendarTab() {
   const { user } = useAuth();
+  const { theme } = useTheme();
   const { padding, maxWidth } = useScreenLayout();
   const [events, setEvents] = useState<Event[]>([]);
   const [cursor, setCursor] = useState(new Date());
@@ -385,7 +387,8 @@ export function CalendarTab() {
 
   return (
     <ScrollView
-      className="flex-1 bg-background"
+      className="flex-1"
+      style={{ backgroundColor: theme.colors.background }}
       bounces={false}
       alwaysBounceVertical={false}
       overScrollMode="never"
@@ -395,25 +398,27 @@ export function CalendarTab() {
         <View className="mb-4 flex-row items-center justify-between">
           <Pressable
             onPress={() => shiftMonth(-1)}
-            className="rounded-lg p-2 active:bg-secondary"
+            className="rounded-lg p-2 active:opacity-80"
+            style={{ backgroundColor: theme.colors.card }}
           >
-            <ChevronLeft color="#f0ecf2" size={20} />
+            <ChevronLeft color={theme.colors.foreground} size={20} />
           </Pressable>
-          <Text className="text-lg font-bold capitalize text-foreground">
+          <Text className="text-lg font-bold capitalize" style={{ color: theme.colors.foreground }}>
             {PL_MONTHS[month]} {year}
           </Text>
           <Pressable
             onPress={() => shiftMonth(1)}
-            className="rounded-lg p-2 active:bg-secondary"
+            className="rounded-lg p-2 active:opacity-80"
+            style={{ backgroundColor: theme.colors.card }}
           >
-            <ChevronRight color="#f0ecf2" size={20} />
+            <ChevronRight color={theme.colors.foreground} size={20} />
           </Pressable>
         </View>
 
         <View className="mb-1 flex-row">
           {PL_DAYS.map((d) => (
             <View key={d} style={{ flex: 1 }} className="py-1">
-              <Text className="text-center text-xs text-muted-foreground">{d}</Text>
+              <Text className="text-center text-xs" style={{ color: theme.colors.mutedForeground }}>{d}</Text>
             </View>
           ))}
         </View>
@@ -460,8 +465,11 @@ export function CalendarTab() {
                 >
                   {isPreviewOpen && (
                     <View
-                      className="absolute rounded-xl border border-border bg-card px-3 py-2"
+                      className="absolute rounded-xl border px-3 py-2 shadow-md"
                       style={{
+                        borderColor: theme.colors.border,
+                        backgroundColor: theme.colors.card,
+                        shadowColor: theme.colors.foreground,
                         bottom: "100%",
                         left: "50%",
                         width: 170,
@@ -470,41 +478,42 @@ export function CalendarTab() {
                         zIndex: 40,
                       }}
                     >
-                      <Text className="text-[11px] font-semibold uppercase tracking-wide text-primary">
+                      <Text className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: theme.colors.primary }}>
                         {has ? "Zaplanowane na" : "Brak zaplanowanej nauki"}
                       </Text>
-                      <Text className="mt-1 text-xs font-semibold text-foreground">{formatDate(k)}</Text>
+                      <Text className="mt-1 text-xs font-semibold" style={{ color: theme.colors.foreground }}>{formatDate(k)}</Text>
                       {has ? (
                         <View className="mt-2 gap-1">
                           {dayEvents.map((event) => (
-                            <View key={event.id} className="rounded-lg bg-secondary px-2 py-1.5">
-                              <Text className="text-[11px] font-semibold text-foreground">
+                            <View key={event.id} className="rounded-lg px-2 py-1.5" style={{ backgroundColor: theme.colors.muted }}>
+                              <Text className="text-[11px] font-semibold" style={{ color: theme.colors.foreground }}>
                                 Godzina: {event.event_time.slice(0, 5)}
                               </Text>
-                              <Text numberOfLines={1} ellipsizeMode="tail" className="text-[11px] text-muted-foreground">
+                              <Text numberOfLines={1} ellipsizeMode="tail" className="text-[11px]" style={{ color: theme.colors.mutedForeground }}>
                                 {event.content}
                               </Text>
                             </View>
                           ))}
                         </View>
                       ) : (
-                        <Text className="mt-2 text-[11px] text-muted-foreground">
+                        <Text className="mt-2 text-[11px]" style={{ color: theme.colors.mutedForeground }}>
                           Nie masz zaplanowanej nauki na ten dzień.
                         </Text>
                       )}
                     </View>
                   )}
                   <View
-                  className={cn(
-                    "flex-1 items-center justify-center rounded-lg border",
-                    isToday ? "border-primary bg-primary/10" : "border-border bg-card",
-                  )}
+                    className="flex-1 items-center justify-center rounded-lg border"
+                    style={{
+                      borderColor: isToday ? theme.colors.primary : theme.colors.border,
+                      backgroundColor: isToday ? `${theme.colors.primary}22` : theme.colors.card,
+                    }}
                   >
-                    <Text className="text-sm font-semibold text-foreground">{d}</Text>
+                    <Text className="text-sm font-semibold" style={{ color: theme.colors.foreground }}>{d}</Text>
                     {has && (
                       <View className="mt-1 flex-row items-center gap-1">
-                        {hasUpcoming && <View className="h-1.5 w-1.5 rounded-full bg-accent" />}
-                        {hasPast && <View className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />}
+                        {hasUpcoming && <View className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: theme.colors.primary }} />}
+                        {hasPast && <View className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: theme.colors.mutedForeground }} />}
                       </View>
                     )}
                   </View>
@@ -516,38 +525,38 @@ export function CalendarTab() {
 
         <View className="mb-4">
           <Button variant="secondary" onPress={() => setOpenAi(true)}>
-            <Sparkles color="#f0ecf2" size={16} />
-            <Text className="text-sm font-semibold text-secondary-foreground">Pomocnik AI</Text>
+            <Sparkles color={theme.colors.primary} size={16} />
+            <Text className="text-sm font-semibold" style={{ color: theme.colors.foreground }}>Pomocnik AI</Text>
           </Button>
         </View>
 
         <View className="mb-2 flex-row items-center justify-between gap-3">
-          <Text className="font-bold text-foreground">Nadchodzące przypomnienia</Text>
+          <Text className="font-bold" style={{ color: theme.colors.foreground }}>Nadchodzące przypomnienia</Text>
           <Button
             variant="outline"
             size="sm"
             onPress={() => setOpenClearAll(true)}
             disabled={events.length === 0}
           >
-            <Trash2 color="#a89fb5" size={14} />
-            <Text className="text-sm font-semibold text-foreground">Usuń wszystkie</Text>
+            <Trash2 color={theme.colors.mutedForeground} size={14} />
+            <Text className="text-sm font-semibold" style={{ color: theme.colors.foreground }}>Usuń wszystkie</Text>
           </Button>
         </View>
         <View className="gap-2">
           {upcomingEvents.length === 0 && (
-            <View className="rounded-xl border border-border bg-card p-4">
-              <Text className="text-sm text-muted-foreground">
+            <View className="rounded-xl border p-4" style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>
+              <Text className="text-sm" style={{ color: theme.colors.mutedForeground }}>
                 Brak nadchodzących przypomnień. Dodaj termin lub poproś o plan AI.
               </Text>
             </View>
           )}
           {upcomingEvents.map((e) => (
-            <View key={e.id} className="flex-row items-start gap-3 rounded-xl border border-border bg-card p-3">
+            <View key={e.id} className="flex-row items-start gap-3 rounded-xl border p-3" style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>
               <Pressable
                 onPress={() => handleNotificationToggle(e)}
                 className="relative h-10 w-10 items-center justify-center"
               >
-                <Bell color={disabledNotificationSet.has(e.id) ? "#a89fb5" : "#a173e8"} size={18} />
+                <Bell color={disabledNotificationSet.has(e.id) ? theme.colors.mutedForeground : theme.colors.primary} size={18} />
                 {disabledNotificationSet.has(e.id) && (
                   <View
                     className="absolute h-0.5 w-6 rounded-full bg-destructive"
@@ -564,13 +573,14 @@ export function CalendarTab() {
                 className="flex-1 flex-row items-start gap-3"
               >
                 <View className="flex-1">
-                  <Text className="text-sm font-semibold text-foreground">
+                  <Text className="text-sm font-semibold" style={{ color: theme.colors.foreground }}>
                     {formatDate(e.event_date)} • {e.event_time.slice(0, 5)}
                   </Text>
                   <Text
                     numberOfLines={expandedReminderId === e.id ? undefined : 1}
                     ellipsizeMode="tail"
-                    className="text-sm text-muted-foreground"
+                    className="text-sm"
+                    style={{ color: theme.colors.mutedForeground }}
                   >
                     {e.content}
                   </Text>
@@ -607,12 +617,12 @@ export function CalendarTab() {
             if (!open && !snoozing) setPendingSnoozeRequest(null);
           }}
         >
-          <DialogContent>
+          <DialogContent style={{ backgroundColor: theme.colors.card, borderColor: theme.colors.border }}>
             <DialogHeader>
-              <DialogTitle>Przełożyć powiadomienie?</DialogTitle>
+              <DialogTitle style={{ color: theme.colors.foreground }}>Przełożyć powiadomienie?</DialogTitle>
             </DialogHeader>
             <View className="gap-3">
-              <Text className="text-sm text-muted-foreground">
+              <Text className="text-sm" style={{ color: theme.colors.mutedForeground }}>
                 {pendingSnoozeRequest?.content
                   ? `Powiadomienie dotyczy: ${pendingSnoozeRequest.content}`
                   : "Czy chcesz przełożyć to powiadomienie?"}
@@ -686,12 +696,12 @@ export function CalendarTab() {
             if (!open && !deletingOne) setPendingDeleteEvent(null);
           }}
         >
-          <DialogContent>
+          <DialogContent style={{ backgroundColor: theme.colors.card, borderColor: theme.colors.border }}>
             <DialogHeader>
-              <DialogTitle>Usunąć przypomnienie?</DialogTitle>
+              <DialogTitle style={{ color: theme.colors.foreground }}>Usunąć przypomnienie?</DialogTitle>
             </DialogHeader>
             <View className="gap-3">
-              <Text className="text-sm text-muted-foreground">
+              <Text className="text-sm" style={{ color: theme.colors.mutedForeground }}>
                 {pendingDeleteEvent
                   ? `Ta operacja usunie przypomnienie z dnia ${formatDate(pendingDeleteEvent.event_date)} o ${pendingDeleteEvent.event_time.slice(0, 5)}.`
                   : "Ta operacja usunie wybrane przypomnienie z kalendarza."}
@@ -723,12 +733,12 @@ export function CalendarTab() {
         </Dialog>
 
         <Dialog open={openClearAll} onOpenChange={setOpenClearAll}>
-          <DialogContent>
+          <DialogContent style={{ backgroundColor: theme.colors.card, borderColor: theme.colors.border }}>
             <DialogHeader>
-              <DialogTitle>Usunąć wszystkie przypomnienia?</DialogTitle>
+              <DialogTitle style={{ color: theme.colors.foreground }}>Usunąć wszystkie przypomnienia?</DialogTitle>
             </DialogHeader>
             <View className="gap-3">
-              <Text className="text-sm text-muted-foreground">
+              <Text className="text-sm" style={{ color: theme.colors.mutedForeground }}>
                 Ta operacja usunie wszystkie zaplanowane przypomnienia z kalendarza.
               </Text>
               <View className="flex-row gap-2">
@@ -803,7 +813,7 @@ function getDefaultSnoozeSelection() {
   };
 }
 
-function DatePickerField({
+export function DatePickerField({
   label,
   value,
   onChange,
@@ -812,6 +822,7 @@ function DatePickerField({
   value: string;
   onChange: (value: string) => void;
 }) {
+  const { theme } = useTheme();
   const [open, setOpen] = useState(false);
   const [cursor, setCursor] = useState(() => parseISODate(value) ?? new Date());
   const selectedDate = parseISODate(value) ?? new Date();
@@ -863,48 +874,51 @@ function DatePickerField({
 
   return (
     <View>
-      <Label>{label}</Label>
+      <Label style={{ color: theme.colors.foreground }}>{label}</Label>
       <Pressable
         onPress={() => {
           setCursor(selectedDate);
           setOpen(true);
         }}
-        className="mt-1 rounded-md border border-input bg-background px-3 py-3 active:opacity-80"
+        className="mt-1 rounded-md border px-3 py-3 active:opacity-80"
+        style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.background }}
       >
-        <Text className="text-sm text-foreground">{formatDate(value)}</Text>
+        <Text className="text-sm" style={{ color: theme.colors.foreground }}>{formatDate(value)}</Text>
       </Pressable>
 
       <Dialog open={open} onOpenChange={setOpen} scrollEnabled={false}>
-        <DialogContent>
+        <DialogContent style={{ backgroundColor: theme.colors.card, borderColor: theme.colors.border }}>
           <DialogHeader>
-            <DialogTitle>Wybierz datę</DialogTitle>
+            <DialogTitle style={{ color: theme.colors.foreground }}>Wybierz datę</DialogTitle>
           </DialogHeader>
 
           <View className="gap-3">
             <View className="flex-row items-center justify-between">
               <Pressable
                 onPress={() => shiftMonth(-1)}
-                className="rounded-lg p-2 active:bg-secondary"
+                className="rounded-lg p-2 active:opacity-80"
+                style={{ backgroundColor: theme.colors.muted }}
               >
-                <ChevronLeft color="#f0ecf2" size={20} />
+                <ChevronLeft color={theme.colors.foreground} size={20} />
               </Pressable>
 
-              <Text className="text-base font-bold capitalize text-foreground">
+              <Text className="text-base font-bold capitalize" style={{ color: theme.colors.foreground }}>
                 {PL_MONTHS[month]} {year}
               </Text>
 
               <Pressable
                 onPress={() => shiftMonth(1)}
-                className="rounded-lg p-2 active:bg-secondary"
+                className="rounded-lg p-2 active:opacity-80"
+                style={{ backgroundColor: theme.colors.muted }}
               >
-                <ChevronRight color="#f0ecf2" size={20} />
+                <ChevronRight color={theme.colors.foreground} size={20} />
               </Pressable>
             </View>
 
             <View className="flex-row">
               {PL_DAYS.map((day) => (
                 <View key={day} style={{ flex: 1 }} className="py-1">
-                  <Text className="text-center text-xs text-muted-foreground">{day}</Text>
+                  <Text className="text-center text-xs" style={{ color: theme.colors.mutedForeground }}>{day}</Text>
                 </View>
               ))}
             </View>
@@ -921,20 +935,15 @@ function DatePickerField({
                   <View key={index} style={{ width: `${100 / 7}%`, aspectRatio: 1, padding: 2 }}>
                     <Pressable
                       onPress={() => selectDate(day)}
-                      className={cn(
-                        "flex-1 items-center justify-center rounded-lg border",
-                        isSelected
-                          ? "border-primary bg-primary"
-                          : isToday
-                            ? "border-primary bg-primary/10"
-                            : "border-border bg-card",
-                      )}
+                      className="flex-1 items-center justify-center rounded-lg border"
+                      style={{
+                        borderColor: isSelected ? theme.colors.primary : isToday ? theme.colors.primary : theme.colors.border,
+                        backgroundColor: isSelected ? theme.colors.primary : isToday ? `${theme.colors.primary}22` : theme.colors.card,
+                      }}
                     >
                       <Text
-                        className={cn(
-                          "text-sm font-semibold",
-                          isSelected ? "text-primary-foreground" : "text-foreground",
-                        )}
+                        className="text-sm font-semibold"
+                        style={{ color: isSelected ? "#fff" : theme.colors.foreground }}
                       >
                         {day}
                       </Text>
@@ -954,7 +963,7 @@ function DatePickerField({
   );
 }
 
-function TimePickerField({
+export function TimePickerField({
   label,
   value,
   onChange,
@@ -963,6 +972,7 @@ function TimePickerField({
   value: string;
   onChange: (value: string) => void;
 }) {
+  const { theme } = useTheme();
   const [open, setOpen] = useState(false);
   const [tempTime, setTempTime] = useState(() => parseTimeValue(value) ?? parseTimeValue("18:00") ?? new Date());
 
@@ -982,26 +992,38 @@ function TimePickerField({
   if (Platform.OS === "web") {
     return (
       <View>
-        <Label>{label}</Label>
-        <Input value={value} onChangeText={onChange} placeholder="18:00" autoCapitalize="none" />
+        <Label style={{ color: theme.colors.foreground }}>{label}</Label>
+        <Input 
+          value={value} 
+          onChangeText={onChange} 
+          placeholder="18:00" 
+          autoCapitalize="none" 
+          style={{ 
+            backgroundColor: theme.colors.background, 
+            borderColor: theme.colors.border, 
+            color: theme.colors.foreground 
+          }} 
+          placeholderTextColor={theme.colors.mutedForeground}
+        />
       </View>
     );
   }
 
   return (
     <View>
-      <Label>{label}</Label>
+      <Label style={{ color: theme.colors.foreground }}>{label}</Label>
       <Pressable
         onPress={() => setOpen(true)}
-        className="mt-1 rounded-md border border-input bg-background px-3 py-3 active:opacity-80"
+        className="mt-1 rounded-md border px-3 py-3 active:opacity-80"
+        style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.background }}
       >
-        <Text className="text-sm text-foreground">{value}</Text>
+        <Text className="text-sm" style={{ color: theme.colors.foreground }}>{value}</Text>
       </Pressable>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        <DialogContent style={{ backgroundColor: theme.colors.card, borderColor: theme.colors.border }}>
           <DialogHeader>
-            <DialogTitle>Wybierz godzinę</DialogTitle>
+            <DialogTitle style={{ color: theme.colors.foreground }}>Wybierz godzinę</DialogTitle>
           </DialogHeader>
 
           <View className="gap-3">
@@ -1010,7 +1032,7 @@ function TimePickerField({
               mode="time"
               display="spinner"
               onChange={handleChange}
-              {...(Platform.OS === "ios" ? { textColor: "#f0ecf2", themeVariant: "dark" as const } : {})}
+              {...(Platform.OS === "ios" ? { textColor: theme.colors.foreground, themeVariant: "dark" as const } : {})}
             />
 
             <View className="flex-row gap-2">
@@ -1070,6 +1092,7 @@ function AddEventDialogBody({
   initialDate: string;
   onAdded: () => void;
 }) {
+  const { theme } = useTheme();
   const { user } = useAuth();
   const [date, setDate] = useState(initialDate);
   const [time, setTime] = useState("18:00");
@@ -1111,16 +1134,26 @@ function AddEventDialogBody({
   };
 
   return (
-    <DialogContent>
+    <DialogContent style={{ backgroundColor: theme.colors.card, borderColor: theme.colors.border }}>
       <DialogHeader>
-        <DialogTitle>Nowy termin nauki</DialogTitle>
+        <DialogTitle style={{ color: theme.colors.foreground }}>Nowy termin nauki</DialogTitle>
       </DialogHeader>
       <View className="gap-3">
         <DatePickerField label="Data" value={date} onChange={setDate} />
         <TimePickerField label="Godzina" value={time} onChange={setTime} />
         <View>
-          <Label>Treść</Label>
-          <Textarea value={content} onChangeText={setContent} placeholder="Np. powtórka pętli for" />
+          <Label style={{ color: theme.colors.foreground }}>Treść</Label>
+          <Textarea 
+            value={content} 
+            onChangeText={setContent} 
+            placeholder="Np. powtórka pętli for" 
+            style={{ 
+              backgroundColor: theme.colors.background, 
+              borderColor: theme.colors.border, 
+              color: theme.colors.foreground 
+            }} 
+            placeholderTextColor={theme.colors.mutedForeground}
+          />
         </View>
         <Button onPress={save} loading={busy} disabled={busy || !content.trim()}>
           Zapisz
@@ -1139,6 +1172,7 @@ function EditEventDialogBody({
   onCanceled: () => void;
   onSaved: () => void;
 }) {
+  const { theme } = useTheme();
   const [date, setDate] = useState(event.event_date);
   const [time, setTime] = useState(event.event_time.slice(0, 5));
   const [content, setContent] = useState(event.content);
@@ -1182,16 +1216,26 @@ function EditEventDialogBody({
   };
 
   return (
-    <DialogContent>
+    <DialogContent style={{ backgroundColor: theme.colors.card, borderColor: theme.colors.border }}>
       <DialogHeader>
-        <DialogTitle>Edytuj termin nauki</DialogTitle>
+        <DialogTitle style={{ color: theme.colors.foreground }}>Edytuj termin nauki</DialogTitle>
       </DialogHeader>
       <View className="gap-3">
         <DatePickerField label="Data" value={date} onChange={setDate} />
         <TimePickerField label="Godzina" value={time} onChange={setTime} />
         <View>
-          <Label>Treść</Label>
-          <Textarea value={content} onChangeText={setContent} placeholder="Np. powtórka pętli for" />
+          <Label style={{ color: theme.colors.foreground }}>Treść</Label>
+          <Textarea 
+            value={content} 
+            onChangeText={setContent} 
+            placeholder="Np. powtórka pętli for" 
+            style={{ 
+              backgroundColor: theme.colors.background, 
+              borderColor: theme.colors.border, 
+              color: theme.colors.foreground 
+            }} 
+            placeholderTextColor={theme.colors.mutedForeground}
+          />
         </View>
         <View className="flex-row gap-2">
           <Button variant="secondary" className="flex-1" onPress={onCanceled} disabled={busy}>
@@ -1207,6 +1251,7 @@ function EditEventDialogBody({
 }
 
 function AiPlannerDialogBody({ onPlanned }: { onPlanned: () => void }) {
+  const { theme } = useTheme();
   const { user } = useAuth();
   const [prompt, setPrompt] = useState(
     "Chcę uczyć się 30 minut dziennie, wieczorem w dni powszednie przez najbliższy tydzień.",
@@ -1281,13 +1326,22 @@ function AiPlannerDialogBody({ onPlanned }: { onPlanned: () => void }) {
   };
 
   return (
-    <DialogContent>
+    <DialogContent style={{ backgroundColor: theme.colors.card, borderColor: theme.colors.border }}>
       <DialogHeader>
-        <DialogTitle>Pomocnik AI</DialogTitle>
+        <DialogTitle style={{ color: theme.colors.foreground }}>Pomocnik AI</DialogTitle>
       </DialogHeader>
       <View className="gap-3">
-        <Label>Powiedz, kiedy chcesz się uczyć</Label>
-        <Textarea value={prompt} onChangeText={setPrompt} numberOfLines={4} />
+        <Label style={{ color: theme.colors.foreground }}>Powiedz, kiedy chcesz się uczyć</Label>
+        <Textarea 
+          value={prompt} 
+          onChangeText={setPrompt} 
+          numberOfLines={4} 
+          style={{ 
+            backgroundColor: theme.colors.background, 
+            borderColor: theme.colors.border, 
+            color: theme.colors.foreground 
+          }} 
+        />
         <Button onPress={ask} loading={busy} disabled={busy}>
           <Sparkles color="#fafafa" size={16} />
           <Text className="text-sm font-semibold text-primary-foreground">
@@ -1295,18 +1349,18 @@ function AiPlannerDialogBody({ onPlanned }: { onPlanned: () => void }) {
           </Text>
         </Button>
         {!!reply && (
-          <View className="rounded-lg bg-secondary p-3">
-            <Text className="text-sm text-foreground">{reply}</Text>
+          <View className="rounded-lg p-3" style={{ backgroundColor: theme.colors.muted }}>
+            <Text className="text-sm" style={{ color: theme.colors.foreground }}>{reply}</Text>
           </View>
         )}
         {proposals.length > 0 && (
           <View className="gap-2">
-            <Text className="text-sm font-semibold text-foreground">
+            <Text className="text-sm font-semibold" style={{ color: theme.colors.foreground }}>
               Propozycje ({proposals.length}):
             </Text>
             {proposals.map((p, i) => (
-              <View key={i} className="rounded border border-border bg-card p-2">
-                <Text className="text-xs text-foreground">
+              <View key={i} className="rounded border p-2" style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>
+                <Text className="text-xs" style={{ color: theme.colors.foreground }}>
                   <Text className="font-bold">
                     {p.date} {p.time}
                   </Text>{" "}
