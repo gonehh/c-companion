@@ -74,7 +74,7 @@ interface AuthCtx {
   refreshProfile: () => Promise<void>;
   refreshStats: () => Promise<void>;
   notifyProgressChanged: () => void;
-  setSkillLevel: (level: string) => Promise<void>;
+  setSkillLevel: (level: string) => Promise<{ error?: string }>;
   setTheme: (theme: ThemeId) => Promise<void>;
   addXp: (amount: number) => Promise<void>;
 }
@@ -323,10 +323,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProgressVersion((prev) => prev + 1);
   };
 
-  const setSkillLevel = async (level: string) => {
-    if (!user) return;
-    await supabase.from("profiles").update({ skill_level: level }).eq("id", user.id);
-    await loadProfile(user.id);
+  const setSkillLevel: AuthCtx["setSkillLevel"] = async (level) => {
+    if (!user) return { error: "Brak zalogowanego użytkownika." };
+    const { error } = await supabase.from("profiles").update({ skill_level: level }).eq("id", user.id);
+    if (error) return { error: error.message };
+    await loadProfile(user.id, user.email ?? null);
+    return {};
   };
 
   const setTheme = async (theme: ThemeId) => {

@@ -41,9 +41,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import { useResponsive, useScreenLayout } from "@/lib/responsive";
 import { useTheme } from "@/lib/theme";
+import { TRACKS, type Track } from "@/lib/cppCourse";
+import { isValidTrack } from "@/components/SkillSurvey";
 
 export function ProfileTab() {
-  const { profile, signOut, user, stats, sessionStartTime, dailyStreak, setTheme, refreshStats, notifyProgressChanged, addXp } = useAuth();
+  const { profile, signOut, user, stats, sessionStartTime, dailyStreak, setTheme, setSkillLevel, refreshStats, notifyProgressChanged, addXp } = useAuth();
   const { theme } = useTheme();
   const { breakpoint } = useResponsive();
   const { padding, maxWidth } = useScreenLayout();
@@ -55,6 +57,7 @@ export function ProfileTab() {
   const [openAchievement, setOpenAchievement] = useState<MedalTier | null>(null);
   const [debugXpInput, setDebugXpInput] = useState("");
   const [updatingDebugXp, setUpdatingDebugXp] = useState(false);
+  const [updatingDebugSkillLevel, setUpdatingDebugSkillLevel] = useState(false);
 
   const loadProfileSnapshot = async () => {
     if (!user) return;
@@ -158,6 +161,8 @@ export function ProfileTab() {
   const activeAchievement = openAchievement
     ? achievements.find((achievement) => achievement.tier === openAchievement) ?? null
     : null;
+  const currentTrack: Track | null = isValidTrack(profile?.skill_level) ? profile.skill_level : null;
+  const currentTrackLabel = TRACKS.find((track) => track.id === currentTrack)?.label ?? "Nie ustawiono";
   const totalXp = Math.max(0, stats?.xp ?? 0);
   const { level: currentLevel, xpIntoLevel, requiredForNext: levelXp } = calculateLevelProgress(totalXp);
   const xpMissing = Math.max(0, levelXp - xpIntoLevel);
@@ -173,6 +178,19 @@ export function ProfileTab() {
     const interval = setInterval(updateTime, 60000);
     return () => clearInterval(interval);
   }, [sessionStartTime]);
+
+  const applyDebugSkillLevelChange = async (track: Track) => {
+    if (updatingDebugSkillLevel || currentTrack === track) return;
+    setUpdatingDebugSkillLevel(true);
+    const { error } = await setSkillLevel(track);
+    setUpdatingDebugSkillLevel(false);
+    if (error) {
+      toast.error(error);
+      return;
+    }
+    const trackLabel = TRACKS.find((option) => option.id === track)?.label ?? track;
+    toast.success(`Ustawiono poziom: ${trackLabel}`);
+  };
 
   return (
     <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
@@ -382,6 +400,39 @@ export function ProfileTab() {
             Debug
           </Text>
           <Text className="mt-2 text-sm" style={{ color: theme.colors.mutedForeground }}>
+            Aktualny skill level: {currentTrackLabel}. Zmiana od razu przełącza ścieżkę kursu na bazie tych samych opcji co przy wyborze poziomu.
+          </Text>
+          <View className="mt-4 gap-3">
+            {TRACKS.map((track) => {
+              const active = currentTrack === track.id;
+              return (
+                <Pressable
+                  key={track.id}
+                  onPress={() => applyDebugSkillLevelChange(track.id)}
+                  disabled={updatingDebugSkillLevel}
+                  className="rounded-xl border p-4"
+                  style={{
+                    borderColor: active ? theme.colors.primary : theme.colors.border,
+                    backgroundColor: active ? `${theme.colors.primary}1A` : theme.colors.card,
+                    opacity: updatingDebugSkillLevel && !active ? 0.7 : 1,
+                  }}
+                >
+                  <Text className="font-semibold" style={{ color: theme.colors.foreground }}>
+                    {track.label}
+                  </Text>
+                  <Text className="mt-1 text-sm" style={{ color: theme.colors.mutedForeground }}>
+                    {track.desc}
+                  </Text>
+                  {active && (
+                    <Text className="mt-2 text-xs font-medium" style={{ color: theme.colors.primary }}>
+                      Aktualnie wybrany
+                    </Text>
+                  )}
+                </Pressable>
+              );
+            })}
+          </View>
+          <Text className="mt-4 text-sm" style={{ color: theme.colors.mutedForeground }}>
             Resetuje cały progres kursu, quizy, egzaminy, XP i poziom. Motyw zostaje bez zmian.
           </Text>
           <Text className="mt-3 text-sm" style={{ color: theme.colors.mutedForeground }}>
